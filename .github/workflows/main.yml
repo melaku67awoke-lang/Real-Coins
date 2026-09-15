@@ -15,14 +15,17 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Find and extract RealCoin ZIP
         shell: bash
         run: |
           set -e
 
-          ZIP=$(find "$GITHUB_WORKSPACE" -maxdepth 1 -type f -name "*.zip" | head -n 1)
+          ZIP=$(find "$GITHUB_WORKSPACE" \
+            -maxdepth 1 \
+            -type f \
+            -name "*.zip" | head -n 1)
 
           if [ -z "$ZIP" ]; then
             echo "ERROR: RealCoin ZIP was not found."
@@ -50,7 +53,7 @@ jobs:
           echo "Android project: $PROJECT"
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -97,9 +100,6 @@ jobs:
         run: |
           set -e
 
-          echo "===== gradle.properties before ====="
-          cat gradle.properties 2>/dev/null || true
-
           touch gradle.properties
 
           if grep -q '^android.disallowKotlinSourceSets=' gradle.properties; then
@@ -110,11 +110,11 @@ jobs:
             echo "android.disallowKotlinSourceSets=false" >> gradle.properties
           fi
 
-          echo "===== gradle.properties after ====="
+          echo "===== gradle.properties ====="
           cat gradle.properties
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.3.1'
 
@@ -124,16 +124,10 @@ jobs:
         run: |
           set -e
 
-          echo "Building project at:"
-          pwd
-
           echo "===== Gradle version ====="
           gradle --version
 
-          echo "===== KSP source directories ====="
-          find app/build/generated/ksp -maxdepth 4 -type d 2>/dev/null || true
-
-          echo "===== Building APK ====="
+          echo "===== Building RealCoin Debug APK ====="
 
           gradle :app:assembleDebug \
             --no-daemon \
@@ -141,13 +135,13 @@ jobs:
             --info \
             -Pandroid.disallowKotlinSourceSets=false
 
-      - name: Find APK
+      - name: Verify APK
         working-directory: ${{ env.PROJECT }}
         shell: bash
         run: |
           set -e
 
-          echo "===== APK files ====="
+          echo "===== Generated APK files ====="
 
           find app/build/outputs/apk \
             -type f \
@@ -163,10 +157,10 @@ jobs:
             exit 1
           fi
 
-          echo "APK generated successfully:"
+          echo "SUCCESS: APK generated:"
           echo "$APK"
 
-      - name: Upload APK
+      - name: Upload RealCoin APK
         uses: actions/upload-artifact@v4
         with:
           name: RealCoin-debug-apk
