@@ -11,75 +11,125 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout latest main
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Find and extract RealCoin ZIP
+      - name: Find RealCoin ZIP
+        id: find_zip
+        shell: bash
         run: |
           set -e
 
-          ZIP_FILE=$(find . -maxdepth 1 -type f -name 'RealCoin_AndroidStudio_CLOUD*.zip' -print -quit)
+          ZIP_FILE=$(find . -maxdepth 2 -type f \
+            \( -name "*.zip" -o -name "*.ZIP" \) \
+            ! -path "./.git/*" \
+            | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: RealCoin ZIP file was not found."
+            echo "ERROR: No ZIP file found."
             exit 1
           fi
 
           echo "Found ZIP: $ZIP_FILE"
+          echo "zip_file=$ZIP_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Extract RealCoin ZIP
+        shell: bash
+        run: |
+          set -e
 
           rm -rf extracted-realcoin
           mkdir -p extracted-realcoin
 
-          unzip -q "$ZIP_FILE" -d extracted-realcoin
+          unzip -q "${{ steps.find_zip.outputs.zip_file }}" \
+            -d extracted-realcoin
 
-          PROJECT_DIR=$(find extracted-realcoin \
-            -type f \
-            -name 'settings.gradle.kts' \
-            -print \
-            -quit | xargs -r dirname)
+          echo "ZIP extracted successfully."
+
+      - name: Copy extracted project
+        shell: bash
+        run: |
+          set -e
+
+          # Find the actual Android project directory.
+          PROJECT_DIR=""
+
+          if [ -f "extracted-realcoin/settings.gradle.kts" ] || \
+             [ -f "extracted-realcoin/settings.gradle" ]; then
+            PROJECT_DIR="extracted-realcoin"
+          else
+            PROJECT_DIR=$(find extracted-realcoin -type f \
+              \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
+              -printf '%h\n' | head -n 1)
+          fi
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android project root was not found."
+            echo "ERROR: Android Studio project was not found."
+            echo "Expected settings.gradle.kts or settings.gradle."
             exit 1
           fi
 
-          echo "Project directory: $PROJECT_DIR"
+          echo "Android project found at: $PROJECT_DIR"
 
-          echo "Copying Android project..."
+          # Copy the project into the repository.
+          cp -a "$PROJECT_DIR"/. .
 
-          rsync -a \
-            --exclude='.github/' \
-            "$PROJECT_DIR"/ ./
+          echo "Project copied successfully."
 
-          echo "Android project extracted successfully."
-
-      - name: Remove temporary files
+      - name: Remove ZIP and temporary files
+        shell: bash
         run: |
+          set -e
+
           rm -rf extracted-realcoin
-          rm -f RealCoin_AndroidStudio_CLOUD*.zip
+          rm -f "${{ steps.find_zip.outputs.zip_file }}"
+
+          echo "Temporary files removed."
+
+      - name: Show changed files
+        shell: bash
+        run: |
+          git status --short
 
       - name: Commit extracted project
+        shell: bash
         run: |
           set -e
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add -A -- ':!.github'
+          git add -A
 
           if git diff --cached --quiet; then
-            echo "No project changes to commit."
+            echo "No changes to commit."
             exit 0
           fi
 
           git commit -m "Extract RealCoin v30 Android project"
 
-          echo "Updating local branch from origin/main..."
+      - name: Synchronize with latest main
+        shell: bash
+        run: |
+          set -e
 
-          git pull --rebase origin main
+          echo "Fetching latest main..."
+          git fetch origin main
 
-          echo "Pushing extracted project..."
+          echo "Rebasing local commit onto latest origin/main..."
+          git rebase origin/main
 
-          git push origin main
+      - name: Push to main
+        shell: bash
+        run: |
+          set -e
+
+          git push origin HEAD:main
+
+          echo "========================================"
+          echo "RealCoin project pushed successfully."
+          echo "========================================"
