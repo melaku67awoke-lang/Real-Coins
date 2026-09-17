@@ -18,15 +18,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       # ------------------------------------------------------------
-      # 1. Checkout
+      # 1. Checkout repository
       # ------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v6
 
       # ------------------------------------------------------------
-      # 2. Java
-      # JDK 21 is used for Robolectric compatibility.
+      # 2. JDK 21
+      # Used for Robolectric compatibility.
       # ------------------------------------------------------------
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -35,22 +36,84 @@ jobs:
           java-version: '21'
 
       # ------------------------------------------------------------
-      # 3. Android SDK
+      # 3. Detect preinstalled Android SDK
+      #
+      # We intentionally DO NOT use android-actions/setup-android.
+      # GitHub-hosted Android runners already provide an Android SDK.
       # ------------------------------------------------------------
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+      - name: Detect Android SDK
+        shell: bash
+        run: |
+          set -e
+
+          echo "ANDROID_HOME=${ANDROID_HOME:-}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}"
+
+          if [ -z "${ANDROID_HOME:-}" ] && [ -n "${ANDROID_SDK_ROOT:-}" ]; then
+            echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          fi
+
+          if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -n "${ANDROID_HOME:-}" ]; then
+            echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          fi
+
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+
+          if [ -z "$SDK_ROOT" ]; then
+            echo "ERROR: Android SDK was not found."
+            exit 1
+          fi
+
+          echo "Using Android SDK: $SDK_ROOT"
+
+          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+
+          if [ -x "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ]; then
+            echo "$SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+            echo "Using latest sdkmanager."
+          elif [ -x "$SDK_ROOT/cmdline-tools/20.0/bin/sdkmanager" ]; then
+            echo "$SDK_ROOT/cmdline-tools/20.0/bin" >> "$GITHUB_PATH"
+            echo "Using sdkmanager 20.0."
+          elif [ -x "$SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager" ]; then
+            echo "$SDK_ROOT/cmdline-tools/16.0/bin" >> "$GITHUB_PATH"
+            echo "Using sdkmanager 16.0."
+          elif command -v sdkmanager >/dev/null 2>&1; then
+            echo "Using preinstalled sdkmanager from PATH."
+          else
+            echo "ERROR: sdkmanager was not found."
+            exit 1
+          fi
 
       # ------------------------------------------------------------
-      # 4. Install Android SDK packages
+      # 4. Install required Android SDK packages
       # ------------------------------------------------------------
       - name: Install Android SDK packages
         shell: bash
         run: |
           set -e
 
-          yes | sdkmanager --licenses >/dev/null || true
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+
+          echo "Android SDK root:"
+          echo "$SDK_ROOT"
+
+          echo ""
+          echo "sdkmanager:"
+          command -v sdkmanager
+          sdkmanager --version
+
+          echo ""
+          echo "Accepting Android SDK licenses..."
+
+          yes | sdkmanager \
+            --sdk_root="$SDK_ROOT" \
+            --licenses >/dev/null || true
+
+          echo ""
+          echo "Installing required SDK packages..."
 
           sdkmanager \
+            --sdk_root="$SDK_ROOT" \
             "platform-tools" \
             "platforms;android-36" \
             "build-tools;36.0.0"
@@ -63,16 +126,31 @@ jobs:
         run: |
           set -e
 
+          echo "========================================"
+          echo "JAVA"
+          echo "========================================"
+
           echo "JAVA_HOME=$JAVA_HOME"
           java -version
 
           echo ""
+          echo "========================================"
+          echo "ANDROID SDK"
+          echo "========================================"
+
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
           echo ""
-          echo "Installed SDK packages:"
-          sdkmanager --list_installed
+          echo "sdkmanager:"
+          command -v sdkmanager
+          sdkmanager --version
+
+          echo ""
+          echo "Installed Android packages:"
+          sdkmanager \
+            --sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}" \
+            --list_installed
 
       # ------------------------------------------------------------
       # 6. Verify Android project
@@ -89,12 +167,16 @@ jobs:
           echo "Android project files found."
 
           echo ""
-          echo "Project structure:"
-          find app/src -maxdepth 3 -type f | sort | head -100
+          echo "Important Gradle files:"
+          ls -la
+
+          echo ""
+          echo "App source directories:"
+          find app/src -maxdepth 3 -type d | sort
 
       # ------------------------------------------------------------
       # 7. Set up Gradle 9.3.1
-      # Required by Android Gradle Plugin 9.1.1.
+      # Required by AGP 9.1.1.
       # ------------------------------------------------------------
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -119,7 +201,8 @@ jobs:
         run: |
           set -e
 
-          gradle --no-daemon \
+          gradle \
+            --no-daemon \
             --stacktrace \
             tasks
 
@@ -127,6 +210,99 @@ jobs:
       # 10. Run unit tests
       #
       # IMPORTANT:
-      # Do not skip failing tests.
-      # Do not use || true.
-      # The
+      # Tests must genuinely pass.
+      # Do NOT skip tests.
+      # Do NOT use || true.
+      # ------------------------------------------------------------
+      - name: Run unit tests
+        shell: bash
+        run: |
+          set -e
+
+          gradle \
+            --no-daemon \
+            --stacktrace \
+            testDebugUnitTest
+
+      # ------------------------------------------------------------
+      # 11. Build debug APK
+      #
+      # Only reached if unit tests pass.
+      # ------------------------------------------------------------
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -e
+
+          gradle \
+            --no-daemon \
+            --stacktrace \
+            assembleDebug
+
+      # ------------------------------------------------------------
+      # 12. Verify debug APK
+      # ------------------------------------------------------------
+      - name: Verify debug APK
+        shell: bash
+        run: |
+          set -e
+
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+
+          if [ ! -f "$APK" ]; then
+            echo "ERROR: Debug APK was not generated."
+            exit 1
+          fi
+
+          echo "========================================"
+          echo "DEBUG APK GENERATED"
+          echo "========================================"
+
+          ls -lh "$APK"
+
+      # ------------------------------------------------------------
+      # 13. Upload debug APK
+      # ------------------------------------------------------------
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: RealCoin-v30-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      # ------------------------------------------------------------
+      # 14. Upload unit test reports
+      # ------------------------------------------------------------
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: RealCoin-v30-unit-test-reports
+          path: |
+            app/build/reports/tests/testDebugUnitTest/**
+            app/build/test-results/testDebugUnitTest/**
+          if-no-files-found: warn
+          retention-days: 14
+
+      # ------------------------------------------------------------
+      # 15. Final verification
+      # ------------------------------------------------------------
+      - name: Final verification
+        shell: bash
+        run: |
+          set -e
+
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+
+          test -f "$APK"
+
+          echo ""
+          echo "========================================"
+          echo "REALCOIN v30 VERIFICATION COMPLETE"
+          echo "========================================"
+          echo "JDK:        21"
+          echo "Gradle:     9.3.1"
+          echo "Unit tests: PASSED"
+          echo "APK:        GENERATED"
+          echo "========================================"
