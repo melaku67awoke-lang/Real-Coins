@@ -1,0 +1,42 @@
+name: Extract RealCoin Project
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract RealCoin ZIP
+        run: |
+          rm -rf extracted-realcoin
+          mkdir extracted-realcoin
+          unzip -q RealCoin_AndroidStudio_CLOUD_BUILD_v30.zip -d extracted-realcoin
+
+          # Find the actual project root inside the ZIP
+          PROJECT_DIR=$(find extracted-realcoin -name settings.gradle.kts -print -quit | xargs dirname)
+
+          echo "Project directory: $PROJECT_DIR"
+
+          cp -R "$PROJECT_DIR"/. .
+
+          rm -rf extracted-realcoin
+
+      - name: Remove ZIP
+        run: |
+          rm -f RealCoin_AndroidStudio_CLOUD_BUILD_v30.zip
+
+      - name: Commit extracted project
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Extract RealCoin v30 Android project"
+          git push
