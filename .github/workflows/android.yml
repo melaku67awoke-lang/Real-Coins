@@ -1,13 +1,13 @@
-name: RealCoin Android Build & Test
+name: Build and Test RealCoin v30
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,111 +18,115 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ------------------------------------------------------------
+      # 1. Checkout
+      # ------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Set up JDK 17
+      # ------------------------------------------------------------
+      # 2. Java
+      # JDK 21 is used for Robolectric compatibility.
+      # ------------------------------------------------------------
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '17'
-          cache: gradle
+          java-version: '21'
 
+      # ------------------------------------------------------------
+      # 3. Android SDK
+      # ------------------------------------------------------------
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
-        with:
-          packages: ''
 
+      # ------------------------------------------------------------
+      # 4. Install Android SDK packages
+      # ------------------------------------------------------------
       - name: Install Android SDK packages
+        shell: bash
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
+          set -e
+
+          yes | sdkmanager --licenses >/dev/null || true
 
           sdkmanager \
             "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+            "platforms;android-36" \
+            "build-tools;36.0.0"
 
+      # ------------------------------------------------------------
+      # 5. Verify Android environment
+      # ------------------------------------------------------------
       - name: Verify Android environment
+        shell: bash
         run: |
+          set -e
+
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+
+          echo ""
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
-          java -version
-          adb version
-          sdkmanager --version
+          echo ""
+          echo "Installed SDK packages:"
+          sdkmanager --list_installed
 
+      # ------------------------------------------------------------
+      # 6. Verify Android project
+      # ------------------------------------------------------------
       - name: Verify Android project
+        shell: bash
         run: |
+          set -e
+
           test -f settings.gradle.kts
           test -f build.gradle.kts
           test -f app/build.gradle.kts
 
-          echo "Android project structure OK."
+          echo "Android project files found."
 
+          echo ""
+          echo "Project structure:"
+          find app/src -maxdepth 3 -type f | sort | head -100
+
+      # ------------------------------------------------------------
+      # 7. Set up Gradle 9.3.1
+      # Required by Android Gradle Plugin 9.1.1.
+      # ------------------------------------------------------------
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.3.1'
 
+      # ------------------------------------------------------------
+      # 8. Verify Gradle
+      # ------------------------------------------------------------
       - name: Verify Gradle
+        shell: bash
         run: |
+          set -e
+
           gradle --version
 
+      # ------------------------------------------------------------
+      # 9. Check Gradle project
+      # ------------------------------------------------------------
       - name: Check Gradle project
+        shell: bash
         run: |
-          gradle --no-daemon tasks
+          set -e
 
-      - name: Run unit tests
-        run: |
-          gradle --no-daemon testDebugUnitTest
+          gradle --no-daemon \
+            --stacktrace \
+            tasks
 
-      - name: Build debug APK
-        run: |
-          gradle --no-daemon assembleDebug
-
-      - name: Verify debug APK
-        run: |
-          APK=$(find app/build/outputs/apk/debug -type f -name "*.apk" | head -n 1)
-
-          if [ -z "$APK" ]; then
-            echo "ERROR: Debug APK was not generated."
-            exit 1
-          fi
-
-          echo "=========================================="
-          echo "DEBUG APK GENERATED SUCCESSFULLY"
-          echo "=========================================="
-          echo "$APK"
-          ls -lh "$APK"
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: RealCoin-v30-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-
-      - name: Upload unit test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: RealCoin-v30-test-reports
-          path: |
-            app/build/test-results/testDebugUnitTest/
-            app/build/reports/tests/testDebugUnitTest/
-          if-no-files-found: warn
-
-      - name: Final verification
-        run: |
-          echo "=========================================="
-          echo "RealCoin v30 BUILD/TEST COMPLETE"
-          echo "=========================================="
-
-          echo "Unit tests: PASSED"
-          echo "Debug build: PASSED"
-          echo "APK: GENERATED"
-
-          find app/build/outputs/apk/debug \
-            -type f \
-            -name "*.apk" \
-            -exec ls -lh {} \;
+      # ------------------------------------------------------------
+      # 10. Run unit tests
+      #
+      # IMPORTANT:
+      # Do not skip failing tests.
+      # Do not use || true.
+      # The
