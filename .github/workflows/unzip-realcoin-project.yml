@@ -64,12 +64,4 @@ jobs:
       - name: Push extracted project
         run: |
           set -e
-
-          git fetch origin main
-
-          if ! git merge-base --is-ancestor HEAD origin/main; then
-            echo "Remote main changed unexpectedly during this workflow."
-            exit 1
-          fi
-
           git push origin HEAD:main
