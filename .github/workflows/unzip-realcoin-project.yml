@@ -6,6 +6,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: unzip-realcoin-project
+  cancel-in-progress: false
+
 jobs:
   unzip-project:
     runs-on: ubuntu-latest
@@ -14,24 +18,34 @@ jobs:
       - name: Checkout main
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Unzip the uploaded project
         run: |
+          set -e
+
           test -f Real-Coins-step28-d1-configured.zip
+
           rm -rf _realcoin_extract
           mkdir _realcoin_extract
+
           unzip -o Real-Coins-step28-d1-configured.zip -d _realcoin_extract
 
           # Never overwrite GitHub Actions workflows
           rm -rf _realcoin_extract/.github/workflows
 
+          # Copy the RealCoin project into the repository
           cp -a _realcoin_extract/. .
+
+          # Clean temporary files
           rm -rf _realcoin_extract
           rm -f Real-Coins-step28-d1-configured.zip
 
       - name: Commit extracted project
         run: |
+          set -e
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -39,8 +53,20 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
-          else
-            git commit -m "Restore RealCoin project files from Step 28 ZIP"
-            git pull --rebase origin main
-            git push origin HEAD:main
+            exit 0
           fi
+
+          git commit -m "Restore RealCoin project files from Step 28 ZIP"
+
+      - name: Sync with latest main
+        run: |
+          set -e
+
+          git fetch origin main
+          git rebase origin/main
+
+      - name: Push extracted project
+        run: |
+          set -e
+
+          git push origin HEAD:main
