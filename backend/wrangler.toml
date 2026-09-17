@@ -1,0 +1,22 @@
+name = "realcoin-password-reset"
+main = "src/index.js"
+compatibility_date = "2026-09-17"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "realcoin-password-reset"
+database_id = "8201829c-94d0-4c3b-93e0-2da391c484cc"
+migrations_dir = "migrations"
+
+[observability]
+enabled = true
+
+[secrets]
+required = [
+  "RESEND_API_KEY",
+  "RESEND_FROM_EMAIL",
+  "OTP_HASH_SECRET",
+  "RATE_LIMIT_SECRET",
+  "RESET_TOKEN_PRIVATE_KEY_PKCS8_B64",
+  "RESET_TOKEN_PUBLIC_KEY_SPKI_B64"
+]
