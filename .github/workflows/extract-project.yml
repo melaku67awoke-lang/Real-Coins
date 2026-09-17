@@ -11,21 +11,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout latest main
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: main
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Find RealCoin ZIP
         id: find_zip
         shell: bash
         run: |
-          set -e
-
-          ZIP_FILE=$(find . -maxdepth 2 -type f \
-            \( -name "*.zip" -o -name "*.ZIP" \) \
+          ZIP_FILE=$(find . -maxdepth 2 -type f -iname "*.zip" \
             ! -path "./.git/*" \
             | head -n 1)
 
@@ -42,66 +43,77 @@ jobs:
         run: |
           set -e
 
+          ZIP_FILE="${{ steps.find_zip.outputs.zip_file }}"
+
           rm -rf extracted-realcoin
           mkdir -p extracted-realcoin
 
-          unzip -q "${{ steps.find_zip.outputs.zip_file }}" \
-            -d extracted-realcoin
+          unzip -q "$ZIP_FILE" -d extracted-realcoin
 
-          echo "ZIP extracted successfully."
+          echo "Extraction completed."
+          echo "Extracted files:"
+          find extracted-realcoin -maxdepth 3 -type f | head -100
 
-      - name: Copy extracted project
+      - name: Copy Android project to repository root
         shell: bash
         run: |
           set -e
 
-          # Find the actual Android project directory.
-          PROJECT_DIR=""
+          # Detect whether the ZIP contains one top-level directory
+          # or the Android project directly.
+          TOP_LEVEL_COUNT=$(find extracted-realcoin -mindepth 1 -maxdepth 1 | wc -l)
 
-          if [ -f "extracted-realcoin/settings.gradle.kts" ] || \
-             [ -f "extracted-realcoin/settings.gradle" ]; then
-            PROJECT_DIR="extracted-realcoin"
+          if [ "$TOP_LEVEL_COUNT" -eq 1 ] && \
+             [ -d "$(find extracted-realcoin -mindepth 1 -maxdepth 1 -type d | head -n 1)" ]; then
+
+            PROJECT_DIR="$(find extracted-realcoin -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+            echo "Project directory detected: $PROJECT_DIR"
+
+            rsync -a \
+              --exclude='.git/' \
+              "$PROJECT_DIR/" ./
+
           else
-            PROJECT_DIR=$(find extracted-realcoin -type f \
-              \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
-              -printf '%h\n' | head -n 1)
+
+            echo "Project files are directly inside ZIP."
+
+            rsync -a \
+              --exclude='.git/' \
+              extracted-realcoin/ ./
+
           fi
 
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: Android Studio project was not found."
-            echo "Expected settings.gradle.kts or settings.gradle."
-            exit 1
-          fi
-
-          echo "Android project found at: $PROJECT_DIR"
-
-          # Copy the project into the repository.
-          cp -a "$PROJECT_DIR"/. .
-
-          echo "Project copied successfully."
-
-      - name: Remove ZIP and temporary files
+      - name: Remove ZIP and temporary extraction directory
         shell: bash
         run: |
-          set -e
-
           rm -rf extracted-realcoin
-          rm -f "${{ steps.find_zip.outputs.zip_file }}"
 
-          echo "Temporary files removed."
+          ZIP_FILE="${{ steps.find_zip.outputs.zip_file }}"
 
-      - name: Show changed files
+          if [ -f "$ZIP_FILE" ]; then
+            rm -f "$ZIP_FILE"
+          fi
+
+      - name: Protect workflow file
         shell: bash
         run: |
+          # Make sure extracting the ZIP cannot accidentally replace
+          # this workflow with another version.
+          git checkout -- .github/workflows/extract-project.yml 2>/dev/null || true
+
+      - name: Show changes
+        shell: bash
+        run: |
+          echo "===== Git status ====="
           git status --short
+
+          echo "===== Git diff summary ====="
+          git diff --stat
 
       - name: Commit extracted project
         shell: bash
         run: |
           set -e
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add -A
 
@@ -112,24 +124,47 @@ jobs:
 
           git commit -m "Extract RealCoin v30 Android project"
 
-      - name: Synchronize with latest main
+      - name: Synchronize with remote main
         shell: bash
         run: |
           set -e
 
-          echo "Fetching latest main..."
           git fetch origin main
 
-          echo "Rebasing local commit onto latest origin/main..."
+          # Rebase our new commit on top of the latest remote main.
           git rebase origin/main
 
-      - name: Push to main
+      - name: Push changes
         shell: bash
         run: |
           set -e
 
-          git push origin HEAD:main
+          # Push with retry protection in case another commit reaches
+          # main between fetch/rebase and push.
+          for attempt in 1 2 3; do
+            echo "Push attempt $attempt..."
 
-          echo "========================================"
-          echo "RealCoin project pushed successfully."
-          echo "========================================"
+            if git push origin HEAD:main; then
+              echo "Push successful."
+              exit 0
+            fi
+
+            if [ "$attempt" -lt 3 ]; then
+              echo "Push rejected. Synchronizing with remote again..."
+
+              git fetch origin main
+              git rebase origin/main
+            fi
+          done
+
+          echo "ERROR: Could not push after 3 attempts."
+          exit 1
+
+      - name: Final status
+        shell: bash
+        run: |
+          echo "===== Final commit ====="
+          git log -1 --oneline
+
+          echo "===== Final status ====="
+          git status --short
