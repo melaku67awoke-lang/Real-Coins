@@ -18,18 +18,14 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-      ANDROID_HOME: /usr/local/lib/android/sdk
       GRADLE_VERSION: "9.3.1"
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      # ------------------------------------------------------------
-      # JAVA 21
-      # Required by Robolectric when testing Android SDK 36
-      # ------------------------------------------------------------
       - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
@@ -37,65 +33,102 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - name: Verify JDK
+      - name: Verify Java
         shell: bash
         run: |
           set -e
           echo "JAVA_HOME=$JAVA_HOME"
-          which java
           java -version
-          which javac
           javac -version
 
-      # ------------------------------------------------------------
-      # ANDROID SDK
-      # ------------------------------------------------------------
       - name: Detect Android SDK
         shell: bash
         run: |
           set -e
+
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
           if [ ! -d "$ANDROID_SDK_ROOT" ]; then
-            echo "Android SDK directory not found"
+            echo "ERROR: Android SDK directory does not exist."
             exit 1
           fi
 
+          echo "Android SDK found:"
           ls -la "$ANDROID_SDK_ROOT"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
+          echo ""
+          echo "Searching for sdkmanager..."
+
+          SDKMANAGER=""
+          for candidate in \
+            "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            "$ANDROID_SDK_ROOT/cmdline-tools/bin/sdkmanager" \
+            "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"
+          do
+            if [ -x "$candidate" ]; then
+              SDKMANAGER="$candidate"
+              break
+            fi
+          done
+
+          if [ -z "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name sdkmanager 2>/dev/null | head -1 || true)"
+          fi
+
+          if [ -z "$SDKMANAGER" ] || [ ! -f "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager was not found."
+            find "$ANDROID_SDK_ROOT" -maxdepth 4 -type f -name sdkmanager -print || true
+            exit 1
+          fi
+
+          echo "sdkmanager found at:"
+          echo "$SDKMANAGER"
+
+          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+
+      - name: Verify Android SDK tools
+        shell: bash
+        run: |
+          set -e
+
+          echo "Using:"
+          echo "$SDKMANAGER"
+
+          "$SDKMANAGER" --version
+          adb version
+
+      - name: Accept Android SDK licenses
+        shell: bash
+        run: |
+          set -e
+
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
 
       - name: Install Android SDK packages
         shell: bash
         run: |
           set -e
 
-          yes | sdkmanager --licenses >/dev/null || true
-
-          sdkmanager \
+          "$SDKMANAGER" \
             "platform-tools" \
             "platforms;android-36" \
             "build-tools;36.0.0"
 
-      - name: Verify Android environment
+      - name: Verify Android SDK packages
         shell: bash
         run: |
           set -e
 
-          echo "=== adb ==="
-          adb version
+          echo "Installed Android SDK packages:"
+          "$SDKMANAGER" --list_installed
 
-          echo "=== SDK platforms ==="
-          sdkmanager --list_installed | grep "platforms;android-36" || true
+          test -d "$ANDROID_SDK_ROOT/platforms/android-36"
+          test -d "$ANDROID_SDK_ROOT/build-tools/36.0.0"
 
-          echo "=== Build tools ==="
-          sdkmanager --list_installed | grep "build-tools;36.0.0" || true
+          echo "Android SDK 36 and Build Tools 36.0.0 are installed."
 
-      # ------------------------------------------------------------
-      # VERIFY PROJECT
-      # ------------------------------------------------------------
       - name: Verify Android project
         shell: bash
         run: |
@@ -105,41 +138,23 @@ jobs:
           test -f build.gradle.kts
           test -f app/build.gradle.kts
           test -f gradle/libs.versions.toml
+          test -f gradle/wrapper/gradle-wrapper.properties
 
           echo "Android project files found."
 
-          echo "=== Project structure ==="
-          find app/src -maxdepth 4 -type f | sort | head -200
-
-      # ------------------------------------------------------------
-      # GRADLE 9.3.1
-      # AGP 9.1.1 requires Gradle 9.3.1+
-      # ------------------------------------------------------------
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: "9.3.1"
 
-      - name: Verify Gradle and Java
+      - name: Verify Gradle
         shell: bash
         run: |
           set -e
 
-          echo "=== Java ==="
           java -version
-
-          echo "=== JAVA_HOME ==="
-          echo "$JAVA_HOME"
-
-          echo "=== Gradle ==="
           gradle --version
 
-      # ------------------------------------------------------------
-      # IMPORTANT:
-      # Explicitly force Gradle to use the JDK 21 installed above.
-      # This prevents Robolectric SDK 36 from accidentally running
-      # on another Java version.
-      # ------------------------------------------------------------
       - name: Check Gradle project
         shell: bash
         run: |
@@ -150,30 +165,14 @@ jobs:
             -Dorg.gradle.java.home="$JAVA_HOME" \
             tasks --all
 
-      # ------------------------------------------------------------
-      # UNIT TESTS
-      # ------------------------------------------------------------
       - name: Run unit tests
         shell: bash
         run: |
           set -e
 
-          echo "========================================"
-          echo "JAVA USED BY TESTS"
-          echo "========================================"
-
           echo "JAVA_HOME=$JAVA_HOME"
           java -version
-
-          echo "========================================"
-          echo "GRADLE JVM"
-          echo "========================================"
-
           gradle --version
-
-          echo "========================================"
-          echo "RUNNING ROBOLECTRIC UNIT TESTS"
-          echo "========================================"
 
           gradle \
             --no-daemon \
@@ -181,10 +180,6 @@ jobs:
             -Dorg.gradle.java.home="$JAVA_HOME" \
             testDebugUnitTest
 
-      # ------------------------------------------------------------
-      # BUILD DEBUG APK
-      # Only runs if all unit tests pass.
-      # ------------------------------------------------------------
       - name: Build debug APK
         shell: bash
         run: |
@@ -196,9 +191,6 @@ jobs:
             -Dorg.gradle.java.home="$JAVA_HOME" \
             assembleDebug
 
-      # ------------------------------------------------------------
-      # VERIFY APK
-      # ------------------------------------------------------------
       - name: Verify debug APK
         shell: bash
         run: |
@@ -211,15 +203,9 @@ jobs:
             exit 1
           fi
 
-          echo "APK successfully generated:"
+          echo "Debug APK successfully generated:"
           ls -lh "$APK"
 
-          echo "APK size:"
-          du -h "$APK"
-
-      # ------------------------------------------------------------
-      # UPLOAD APK
-      # ------------------------------------------------------------
       - name: Upload debug APK
         if: success()
         uses: actions/upload-artifact@v4
@@ -228,9 +214,6 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      # ------------------------------------------------------------
-      # UPLOAD TEST REPORTS
-      # ------------------------------------------------------------
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
