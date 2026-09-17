@@ -18,9 +18,10 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+      ANDROID_HOME: ${{ github.workspace }}/android-sdk
       GRADLE_VERSION: "9.3.1"
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      CMDLINE_TOOLS_VERSION: "15859902"
 
     steps:
       - name: Checkout repository
@@ -34,14 +35,68 @@ jobs:
           cache: gradle
 
       - name: Verify Java
-        shell: bash
         run: |
           set -e
           echo "JAVA_HOME=$JAVA_HOME"
           java -version
           javac -version
 
-      - name: Detect Android SDK
+      - name: Install Android command-line tools
+        shell: bash
+        run: |
+          set -e
+
+          SDK_ROOT="$ANDROID_SDK_ROOT"
+          TOOLS_DIR="$SDK_ROOT/cmdline-tools"
+
+          mkdir -p "$TOOLS_DIR"
+
+          echo "Downloading official Android command-line tools..."
+
+          curl -fL \
+            --retry 5 \
+            --retry-delay 3 \
+            -o /tmp/cmdline-tools.zip \
+            "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS_VERSION}_latest.zip"
+
+          echo "Downloaded:"
+          ls -lh /tmp/cmdline-tools.zip
+
+          rm -rf "$TOOLS_DIR/latest"
+          mkdir -p "$TOOLS_DIR/latest"
+
+          unzip -q /tmp/cmdline-tools.zip -d "$TOOLS_DIR"
+
+          # Google ZIP contains a directory named cmdline-tools.
+          # Move its contents into the standard latest directory.
+          cp -a "$TOOLS_DIR/cmdline-tools/." "$TOOLS_DIR/latest/"
+
+          rm -rf "$TOOLS_DIR/cmdline-tools"
+          rm -f /tmp/cmdline-tools.zip
+
+          echo "Android command-line tools installed:"
+          ls -la "$TOOLS_DIR/latest/bin"
+
+      - name: Configure Android SDK tools
+        shell: bash
+        run: |
+          set -e
+
+          SDKMANAGER="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager was not installed."
+            find "$ANDROID_SDK_ROOT" -type f -name sdkmanager -print
+            exit 1
+          fi
+
+          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
+          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+
+          echo "SDKMANAGER=$SDKMANAGER"
+
+      - name: Verify Android SDK tools
         shell: bash
         run: |
           set -e
@@ -49,62 +104,14 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
-          if [ ! -d "$ANDROID_SDK_ROOT" ]; then
-            echo "ERROR: Android SDK directory does not exist."
-            exit 1
-          fi
-
-          echo "Android SDK found:"
-          ls -la "$ANDROID_SDK_ROOT"
-
-          echo ""
-          echo "Searching for sdkmanager..."
-
-          SDKMANAGER=""
-          for candidate in \
-            "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
-            "$ANDROID_SDK_ROOT/cmdline-tools/bin/sdkmanager" \
-            "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"
-          do
-            if [ -x "$candidate" ]; then
-              SDKMANAGER="$candidate"
-              break
-            fi
-          done
-
-          if [ -z "$SDKMANAGER" ]; then
-            SDKMANAGER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name sdkmanager 2>/dev/null | head -1 || true)"
-          fi
-
-          if [ -z "$SDKMANAGER" ] || [ ! -f "$SDKMANAGER" ]; then
-            echo "ERROR: sdkmanager was not found."
-            find "$ANDROID_SDK_ROOT" -maxdepth 4 -type f -name sdkmanager -print || true
-            exit 1
-          fi
-
-          echo "sdkmanager found at:"
-          echo "$SDKMANAGER"
-
-          echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
-          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
-
-      - name: Verify Android SDK tools
-        shell: bash
-        run: |
-          set -e
-
-          echo "Using:"
-          echo "$SDKMANAGER"
-
           "$SDKMANAGER" --version
-          adb version
 
       - name: Accept Android SDK licenses
         shell: bash
         run: |
           set -e
 
-          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          yes | "$SDKMANAGER" --licenses >/dev/null
 
       - name: Install Android SDK packages
         shell: bash
@@ -116,18 +123,19 @@ jobs:
             "platforms;android-36" \
             "build-tools;36.0.0"
 
-      - name: Verify Android SDK packages
+      - name: Verify Android SDK
         shell: bash
         run: |
           set -e
 
-          echo "Installed Android SDK packages:"
+          echo "Installed SDK packages:"
           "$SDKMANAGER" --list_installed
 
           test -d "$ANDROID_SDK_ROOT/platforms/android-36"
           test -d "$ANDROID_SDK_ROOT/build-tools/36.0.0"
+          test -x "$ANDROID_SDK_ROOT/platform-tools/adb"
 
-          echo "Android SDK 36 and Build Tools 36.0.0 are installed."
+          echo "Android SDK verification PASSED."
 
       - name: Verify Android project
         shell: bash
@@ -140,7 +148,7 @@ jobs:
           test -f gradle/libs.versions.toml
           test -f gradle/wrapper/gradle-wrapper.properties
 
-          echo "Android project files found."
+          echo "RealCoin Android project detected."
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -198,12 +206,9 @@ jobs:
 
           APK="app/build/outputs/apk/debug/app-debug.apk"
 
-          if [ ! -f "$APK" ]; then
-            echo "ERROR: Debug APK was not generated."
-            exit 1
-          fi
+          test -f "$APK"
 
-          echo "Debug APK successfully generated:"
+          echo "APK successfully generated:"
           ls -lh "$APK"
 
       - name: Upload debug APK
