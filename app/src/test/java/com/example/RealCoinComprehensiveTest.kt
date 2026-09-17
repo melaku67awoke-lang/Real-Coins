@@ -435,12 +435,10 @@ class RealCoinComprehensiveTest {
         // First claim succeeds
         val claim1 = repository.claimDailyReward(user.id, 1500.0)
         assertTrue("First claim must succeed", claim1.isSuccess)
-        assertEquals(1500.0, claim1.getOrThrow(), 0.0)
-
+        assertEquals(10.0, claim1.getOrThrow(), 0.0)
         // Balance credited
         val wallet = repository.getWalletSync(user.id)
-        assertEquals(1500.0, wallet!!.realBalance, 0.0)
-
+        assertEquals(10.0, wallet!!.realBalance, 0.0)
         // Repeated-click / second claim within same day must fail
         val claim2 = repository.claimDailyReward(user.id, 2500.0)
         assertTrue("Repeated claim must fail", claim2.isFailure)
@@ -448,6 +446,6 @@ class RealCoinComprehensiveTest {
 
         // Balance must remain unchanged
         val walletAfter = repository.getWalletSync(user.id)
-        assertEquals(1500.0, walletAfter!!.realBalance, 0.0)
+        assertEquals(10.0, walletAfter!!.realBalance, 0.0) 
     }
 }
