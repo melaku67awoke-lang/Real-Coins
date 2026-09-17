@@ -35,9 +35,12 @@ jobs:
           cache: gradle
 
       - name: Verify Java
+        shell: bash
         run: |
           set -e
+
           echo "JAVA_HOME=$JAVA_HOME"
+
           java -version
           javac -version
 
@@ -67,14 +70,19 @@ jobs:
 
           unzip -q /tmp/cmdline-tools.zip -d "$TOOLS_DIR"
 
-          # Google ZIP contains a directory named cmdline-tools.
-          # Move its contents into the standard latest directory.
-          cp -a "$TOOLS_DIR/cmdline-tools/." "$TOOLS_DIR/latest/"
+          if [ -d "$TOOLS_DIR/cmdline-tools" ]; then
+            cp -a "$TOOLS_DIR/cmdline-tools/." "$TOOLS_DIR/latest/"
+            rm -rf "$TOOLS_DIR/cmdline-tools"
+          else
+            echo "ERROR: Expected cmdline-tools directory was not found."
+            find "$TOOLS_DIR" -maxdepth 3 -type f -print
+            exit 1
+          fi
 
-          rm -rf "$TOOLS_DIR/cmdline-tools"
           rm -f /tmp/cmdline-tools.zip
 
-          echo "Android command-line tools installed:"
+          echo "Android command-line tools installed."
+
           ls -la "$TOOLS_DIR/latest/bin"
 
       - name: Configure Android SDK tools
@@ -86,11 +94,17 @@ jobs:
 
           if [ ! -x "$SDKMANAGER" ]; then
             echo "ERROR: sdkmanager was not installed."
-            find "$ANDROID_SDK_ROOT" -type f -name sdkmanager -print
+
+            find "$ANDROID_SDK_ROOT" \
+              -type f \
+              -name sdkmanager \
+              -print
+
             exit 1
           fi
 
           echo "SDKMANAGER=$SDKMANAGER" >> "$GITHUB_ENV"
+
           echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
           echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
 
@@ -104,37 +118,76 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
+          echo "Checking sdkmanager..."
+
           "$SDKMANAGER" --version
+
+          echo "Android SDK command-line tools verified."
 
       - name: Accept Android SDK licenses
         shell: bash
         run: |
           set -e
 
-          yes | "$SDKMANAGER" --licenses >/dev/null
+          echo "Accepting Android SDK licenses..."
+
+          # sdkmanager can close the input pipe after receiving
+          # the required answers. Ignore the harmless exit from
+          # the 'yes' process while still checking sdkmanager itself.
+          set +e
+
+          yes | "$SDKMANAGER" --licenses
+
+          SDK_STATUS=${PIPESTATUS[1]}
+
+          set -e
+
+          if [ "$SDK_STATUS" -ne 0 ]; then
+            echo "ERROR: sdkmanager failed while accepting licenses."
+            exit "$SDK_STATUS"
+          fi
+
+          echo "Android SDK licenses accepted successfully."
 
       - name: Install Android SDK packages
         shell: bash
         run: |
           set -e
 
+          echo "Installing Android SDK packages..."
+
           "$SDKMANAGER" \
             "platform-tools" \
             "platforms;android-36" \
             "build-tools;36.0.0"
+
+          echo "Android SDK packages installed successfully."
 
       - name: Verify Android SDK
         shell: bash
         run: |
           set -e
 
-          echo "Installed SDK packages:"
+          echo "Installed Android SDK packages:"
+
           "$SDKMANAGER" --list_installed
 
+          echo ""
+          echo "Checking Android 36 platform..."
+
           test -d "$ANDROID_SDK_ROOT/platforms/android-36"
+
+          echo "Checking Build Tools 36.0.0..."
+
           test -d "$ANDROID_SDK_ROOT/build-tools/36.0.0"
+
+          echo "Checking ADB..."
+
           test -x "$ANDROID_SDK_ROOT/platform-tools/adb"
 
+          adb version
+
+          echo ""
           echo "Android SDK verification PASSED."
 
       - name: Verify Android project
@@ -142,13 +195,15 @@ jobs:
         run: |
           set -e
 
+          echo "Checking RealCoin Android project..."
+
           test -f settings.gradle.kts
           test -f build.gradle.kts
           test -f app/build.gradle.kts
           test -f gradle/libs.versions.toml
           test -f gradle/wrapper/gradle-wrapper.properties
 
-          echo "RealCoin Android project detected."
+          echo "Android project files found."
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
@@ -160,7 +215,13 @@ jobs:
         run: |
           set -e
 
+          echo "JAVA_HOME=$JAVA_HOME"
+
           java -version
+
+          echo ""
+          echo "Gradle version:"
+
           gradle --version
 
       - name: Check Gradle project
@@ -168,19 +229,33 @@ jobs:
         run: |
           set -e
 
+          echo "Checking Gradle project..."
+
           gradle \
             --no-daemon \
             -Dorg.gradle.java.home="$JAVA_HOME" \
             tasks --all
+
+          echo "Gradle project check PASSED."
 
       - name: Run unit tests
         shell: bash
         run: |
           set -e
 
+          echo "Running RealCoin unit tests..."
+
           echo "JAVA_HOME=$JAVA_HOME"
+
           java -version
+
+          echo ""
+          echo "Gradle:"
+
           gradle --version
+
+          echo ""
+          echo "Running testDebugUnitTest..."
 
           gradle \
             --no-daemon \
@@ -188,16 +263,24 @@ jobs:
             -Dorg.gradle.java.home="$JAVA_HOME" \
             testDebugUnitTest
 
+          echo ""
+          echo "Unit tests PASSED."
+
       - name: Build debug APK
         shell: bash
         run: |
           set -e
+
+          echo "Building RealCoin debug APK..."
 
           gradle \
             --no-daemon \
             --stacktrace \
             -Dorg.gradle.java.home="$JAVA_HOME" \
             assembleDebug
+
+          echo ""
+          echo "Debug APK build completed."
 
       - name: Verify debug APK
         shell: bash
@@ -206,10 +289,20 @@ jobs:
 
           APK="app/build/outputs/apk/debug/app-debug.apk"
 
-          test -f "$APK"
+          if [ ! -f "$APK" ]; then
+            echo "ERROR: Debug APK was not generated."
+            exit 1
+          fi
 
-          echo "APK successfully generated:"
+          echo "========================================"
+          echo "DEBUG APK SUCCESSFULLY GENERATED"
+          echo "========================================"
+
           ls -lh "$APK"
+
+          echo ""
+          echo "APK size:"
+          du -h "$APK"
 
       - name: Upload debug APK
         if: success()
