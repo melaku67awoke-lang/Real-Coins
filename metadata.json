@@ -1,0 +1,6 @@
+{
+  "name": "RealCoin",
+  "description": "RealCoin Wallet & P2P with BEP-20 deposit/withdrawal and $50 minimum threshold",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
