@@ -13,31 +13,57 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Extract RealCoin ZIP
+      - name: Find and extract RealCoin ZIP
         run: |
+          set -e
+
+          ZIP_FILE=$(find . -maxdepth 1 -type f -name 'RealCoin_AndroidStudio_CLOUD*.zip' -print -quit)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: RealCoin ZIP file was not found."
+            exit 1
+          fi
+
+          echo "Found ZIP: $ZIP_FILE"
+
           rm -rf extracted-realcoin
-          mkdir extracted-realcoin
+          mkdir -p extracted-realcoin
 
-          unzip -q RealCoin_AndroidStudio_CLOUD*.zip -d extracted-realcoin
+          unzip -q "$ZIP_FILE" -d extracted-realcoin
 
-          PROJECT_DIR=$(find extracted-realcoin -type f -name "settings.gradle.kts" -print -quit | xargs dirname)
+          PROJECT_DIR=$(find extracted-realcoin \
+            -type f \
+            -name 'settings.gradle.kts' \
+            -print \
+            -quit | xargs -r dirname)
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: Android project root was not found."
+            exit 1
+          fi
 
           echo "Project directory: $PROJECT_DIR"
 
-          # Copy the Android project but NEVER copy GitHub workflow files
+          echo "Copying Android project..."
+
           rsync -a \
             --exclude='.github/' \
             "$PROJECT_DIR"/ ./
 
-          rm -rf extracted-realcoin
+          echo "Android project extracted successfully."
 
-      - name: Remove ZIP
+      - name: Remove temporary files
         run: |
+          rm -rf extracted-realcoin
           rm -f RealCoin_AndroidStudio_CLOUD*.zip
 
       - name: Commit extracted project
         run: |
+          set -e
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -48,5 +74,12 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Extract RealCoin Android project"
-          git push
+          git commit -m "Extract RealCoin v30 Android project"
+
+          echo "Updating local branch from origin/main..."
+
+          git pull --rebase origin main
+
+          echo "Pushing extracted project..."
+
+          git push origin main
