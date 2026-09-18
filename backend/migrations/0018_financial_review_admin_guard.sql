@@ -7,12 +7,15 @@ BEFORE UPDATE OF status ON wallet_financial_requests
 WHEN OLD.status = 'PENDING'
  AND NEW.status IN ('APPROVED', 'REJECTED')
 BEGIN
-    SELECT CASE
+    SELECT (CASE
         WHEN NEW.reviewed_by_admin_id IS NULL
-          OR (SELECT COUNT(*) FROM auth_accounts a
+          OR (
+              SELECT COUNT(*)
+              FROM auth_accounts a
               WHERE a.id = NEW.reviewed_by_admin_id
                 AND a.role = 'ADMIN'
-                AND a.disabled_at_ms IS NULL) = 0
+                AND a.disabled_at_ms IS NULL
+          ) = 0
         THEN RAISE(ABORT, 'financial_review_admin_required')
-    END;
+    END);
 END;
