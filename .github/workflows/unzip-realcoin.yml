@@ -1,4 +1,4 @@
-name: Unzip Real-Coins Final Master
+name: unzip
 
 on:
   workflow_dispatch:
@@ -30,6 +30,7 @@ jobs:
 
           rsync -a --delete \
             --exclude='.git/' \
+            --exclude='.github/workflows/' \
             --exclude='Real-Coins-FINAL-MASTER.zip' \
             /tmp/realcoins/ ./
 
