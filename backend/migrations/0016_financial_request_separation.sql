@@ -7,9 +7,9 @@ BEFORE UPDATE OF status ON wallet_financial_requests
 WHEN OLD.status = 'PENDING'
  AND NEW.status = 'APPROVED'
 BEGIN
-    SELECT CASE
+    SELECT (CASE
         WHEN NEW.reviewed_by_admin_id IS NULL
           OR NEW.reviewed_by_admin_id = OLD.account_id
         THEN RAISE(ABORT, 'financial_request_self_approval_forbidden')
-    END;
+    END);
 END;
