@@ -5,52 +5,64 @@ import java.util.Locale
 class PasswordResetService(
     private val api: PasswordResetApi = PasswordResetNetwork.api
 ) {
-    suspend fun requestOtp(email: String): Result<RequestOtpResponse> {
+    suspend fun requestRecovery(email: String): Result<RecoveryResponse> {
         val normalized = email.trim().lowercase(Locale.ROOT)
+
         if (!isValidEmail(normalized)) {
-            return Result.failure(IllegalArgumentException("Enter a valid email address"))
+            return Result.failure(
+                IllegalArgumentException("Enter a valid email address")
+            )
         }
 
         return runCatching {
-            val response = api.requestOtp(RequestOtpRequest(normalized))
+            val response = api.requestRecovery(
+                RecoveryRequest(normalized)
+            )
+
             if (!response.isSuccessful) {
-                throw IllegalStateException("Password reset request failed (${response.code()})")
+                throw IllegalStateException(
+                    "Password recovery request failed (${response.code()})"
+                )
             }
-            response.body()?.takeIf { it.ok && !it.resetSessionId.isNullOrBlank() }
-                ?: throw IllegalStateException("Invalid password reset response")
+
+            response.body()?.takeIf {
+                it.ok && !it.recoveryRequestId.isNullOrBlank()
+            } ?: throw IllegalStateException(
+                "Invalid password recovery response"
+            )
         }
     }
 
-    suspend fun verifyOtp(resetSessionId: String, otp: String): Result<VerifyOtpResponse> {
-        if (resetSessionId.isBlank() || !otp.matches(Regex("^\\d{6}$"))) {
-            return Result.failure(IllegalArgumentException("Enter the 6-digit confirmation code"))
+    suspend fun checkRecoveryStatus(
+        recoveryRequestId: String
+    ): Result<RecoveryStatusResponse> {
+        if (recoveryRequestId.isBlank()) {
+            return Result.failure(
+                IllegalArgumentException("Recovery request ID is missing")
+            )
         }
 
         return runCatching {
-            val response = api.verifyOtp(VerifyOtpRequest(resetSessionId.trim(), otp))
+            val response = api.checkRecoveryStatus(
+                RecoveryStatusRequest(recoveryRequestId.trim())
+            )
+
             if (!response.isSuccessful) {
-                throw IllegalStateException("Confirmation code is invalid or expired")
+                throw IllegalStateException(
+                    "Could not check recovery request (${response.code()})"
+                )
             }
-            response.body()?.takeIf { it.ok && !it.resetAuthorization.isNullOrBlank() }
-                ?: throw IllegalStateException("Invalid password reset response")
-        }
-    }
 
-    suspend fun consumeResetAuthorization(resetAuthorization: String): Result<String> {
-        if (resetAuthorization.isBlank()) {
-            return Result.failure(IllegalArgumentException("Password reset authorization is missing"))
-        }
-        return runCatching {
-            val response = api.consumeResetAuthorization(ConsumeResetAuthorizationRequest(resetAuthorization.trim()))
-            val body = response.body()
-            if (!response.isSuccessful || body?.ok != true || body.email.isNullOrBlank()) {
-                throw IllegalStateException("Password reset authorization is expired or already used")
-            }
-            body.email.trim().lowercase(Locale.ROOT)
+            response.body()?.takeIf { it.ok }
+                ?: throw IllegalStateException(
+                    "Invalid recovery status response"
+                )
         }
     }
 
     private fun isValidEmail(email: String): Boolean {
-        return email.length in 3..254 && Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$").matches(email)
+        return email.length in 3..254 &&
+            Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
+                .matches(email)
     }
 }
