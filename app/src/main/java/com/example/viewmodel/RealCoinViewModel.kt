@@ -22,92 +22,165 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class RealCoinViewModel(application: Application) : AndroidViewModel(application) {
 
-    val repository: RealCoinRepository = RealCoinRepository(AppDatabase.getInstance(application), application)
+    val repository: RealCoinRepository =
+        RealCoinRepository(AppDatabase.getInstance(application), application)
+
     private val passwordResetService = PasswordResetService()
 
     private val _currentUser = MutableStateFlow<UserEntity?>(null)
-    private val _referralSummary = MutableStateFlow<com.example.data.backend.ReferralResponse?>(null)
-    val referralSummary: StateFlow<com.example.data.backend.ReferralResponse?> = _referralSummary.asStateFlow()
 
-    val currentUser: StateFlow<UserEntity?> = _currentUser.asStateFlow()
+    private val _referralSummary =
+        MutableStateFlow<com.example.data.backend.ReferralResponse?>(null)
+
+    val referralSummary: StateFlow<com.example.data.backend.ReferralResponse?> =
+        _referralSummary.asStateFlow()
+
+    val currentUser: StateFlow<UserEntity?> =
+        _currentUser.asStateFlow()
 
     // Active User's Wallet Flow
     val currentWallet: StateFlow<WalletEntity?> = _currentUser
         .flatMapLatest { user ->
-            if (user == null) flowOf(null)
-            else repository.getWallet(user.id)
+            if (user == null) {
+                flowOf(null)
+            } else {
+                repository.getWallet(user.id)
+            }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            null
+        )
 
     // Active User's KYC Flow
     val currentKyc: StateFlow<KycEntity?> = _currentUser
         .flatMapLatest { user ->
-            if (user == null) flowOf(null)
-            else repository.getKycForUser(user.id)
+            if (user == null) {
+                flowOf(null)
+            } else {
+                repository.getKycForUser(user.id)
+            }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            null
+        )
 
     // Active User's Transactions / Ledger Flow
     val transactions: StateFlow<List<TransactionRecord>> = _currentUser
         .flatMapLatest { user ->
-            if (user == null) flowOf(emptyList())
-            else repository.getLedgerForUser(user.id).map { ledgerEntries ->
-                ledgerEntries.map { entry ->
-                    val txType = when (entry.type) {
-                        "DEPOSIT" -> TransactionType.DEPOSIT
-                        "WITHDRAWAL_LOCK", "WITHDRAWAL_CONFIRMED" -> TransactionType.WITHDRAWAL
-                        "REWARD_CLAIM" -> TransactionType.SPIN_REWARD
-                        "P2P_ESCROW_RELEASE" -> {
-                            if (entry.amount > 0) TransactionType.P2P_BUY else TransactionType.P2P_SELL
+            if (user == null) {
+                flowOf(emptyList())
+            } else {
+                repository.getLedgerForUser(user.id).map { ledgerEntries ->
+                    ledgerEntries.map { entry ->
+                        val txType = when (entry.type) {
+                            "DEPOSIT" ->
+                                TransactionType.DEPOSIT
+
+                            "WITHDRAWAL_LOCK",
+                            "WITHDRAWAL_CONFIRMED" ->
+                                TransactionType.WITHDRAWAL
+
+                            "REWARD_CLAIM" ->
+                                TransactionType.SPIN_REWARD
+
+                            "P2P_ESCROW_RELEASE" -> {
+                                if (entry.amount > 0) {
+                                    TransactionType.P2P_BUY
+                                } else {
+                                    TransactionType.P2P_SELL
+                                }
+                            }
+
+                            else ->
+                                TransactionType.DEPOSIT
                         }
-                        else -> TransactionType.DEPOSIT
+
+                        val absAmount = kotlin.math.abs(entry.amount)
+
+                        TransactionRecord(
+                            id = entry.id,
+                            type = txType,
+                            amountRealCoin = absAmount,
+                            usdValue =
+                                absAmount * repository.getRealCoinUsdPrice(),
+                            txHashOrAddress =
+                                entry.notes.ifBlank {
+                                    entry.referenceId
+                                },
+                            network = "BEP20",
+                            status = when (entry.type) {
+                                "WITHDRAWAL_LOCK" ->
+                                    "Pending Review"
+
+                                "WITHDRAWAL_CONFIRMED" ->
+                                    "Completed"
+
+                                "WITHDRAWAL_REFUND" ->
+                                    "Refunded"
+
+                                "DEPOSIT" ->
+                                    "Completed"
+
+                                "REWARD_CLAIM" ->
+                                    "Completed"
+
+                                else ->
+                                    "Completed"
+                            },
+                            timestamp = entry.timestamp
+                        )
                     }
-                    val absAmount = kotlin.math.abs(entry.amount)
-                    TransactionRecord(
-                        id = entry.id,
-                        type = txType,
-                        amountRealCoin = absAmount,
-                        usdValue = absAmount * (repository.getRealCoinUsdPrice()),
-                        txHashOrAddress = entry.notes.ifBlank { entry.referenceId },
-                        network = "BEP20",
-                        status = when (entry.type) {
-                            "WITHDRAWAL_LOCK" -> "Pending Review"
-                            "WITHDRAWAL_CONFIRMED" -> "Completed"
-                            "WITHDRAWAL_REFUND" -> "Refunded"
-                            "DEPOSIT" -> "Completed"
-                            "REWARD_CLAIM" -> "Completed"
-                            else -> "Completed"
-                        },
-                        timestamp = entry.timestamp
-                    )
                 }
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
 
-    // Active P2P Ads Flow (Mapped to P2POrder UI model)
+    // Active P2P Ads Flow
     // The logged-in user can manage only their own active advertisements.
     val myActiveP2PAds: StateFlow<List<P2PAdEntity>> = _currentUser
-        .flatMapLatest { user -> if (user == null) flowOf(emptyList()) else repository.getActiveP2PAdsForUser(user.id) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val p2pOrders: StateFlow<List<P2POrder>> = repository.getActiveP2PAds()
-        .map { ads ->
-            ads.map { ad ->
-                P2POrder(
-                    id = ad.id,
-                    traderName = ad.sellerName, // Distinct trader name, not logged-in user
-                    type = ad.type,
-                    cryptoAmount = ad.cryptoAmount,
-                    fiatPrice = ad.fiatPrice,
-                    fiatCurrency = ad.fiatCurrency,
-                    paymentMethod = ad.paymentMethod,
-                    minOrderEtb = ad.minOrderEtb,
-                    maxOrderEtb = ad.maxOrderEtb
-                )
+        .flatMapLatest { user ->
+            if (user == null) {
+                flowOf(emptyList())
+            } else {
+                repository.getActiveP2PAdsForUser(user.id)
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5000),
+            emptyList()
+        )
+
+    val p2pOrders: StateFlow<List<P2POrder>> =
+        repository.getActiveP2PAds()
+            .map { ads ->
+                ads.map { ad ->
+                    P2POrder(
+                        id = ad.id,
+                        traderName = ad.sellerName,
+                        type = ad.type,
+                        cryptoAmount = ad.cryptoAmount,
+                        fiatPrice = ad.fiatPrice,
+                        fiatCurrency = ad.fiatCurrency,
+                        paymentMethod = ad.paymentMethod,
+                        minOrderEtb = ad.minOrderEtb,
+                        maxOrderEtb = ad.maxOrderEtb
+                    )
+                }
+            }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                emptyList()
+            )
 
     // Combined User Profile for UI
     val userProfile: StateFlow<UserProfile> = combine(
@@ -130,8 +203,11 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
                 role = user.role
             )
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UserProfile())
-
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        UserProfile()
+    )
 
     fun register(
         username: String,
@@ -142,17 +218,48 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
         onError: (String) -> Unit
     ) {
         viewModelScope.launch {
-            val result = repository.register(username, email, pass, referralCode)
+            val result = repository.register(
+                username,
+                email,
+                pass,
+                referralCode
+            )
+
             result.onSuccess { user ->
                 repository.connectBackendSession(user, pass)
                     .onSuccess {
                         _currentUser.value = user
-                        viewModelScope.launch { repository.refreshP2PFromBackend(); repository.getReferralSummary().onSuccess { _referralSummary.value = it } }
+
+                        viewModelScope.launch {
+                            repository.refreshP2PFromBackend()
+
+                            repository.getReferralSummary()
+                                .onSuccess {
+                                    _referralSummary.value = it
+                                }
+                        }
+
                         onSuccess(user)
                     }
-                    .onFailure { err -> onError(err.message ?: "Backend account setup failed") }
+                    .onFailure { err ->
+
+                        // Backend registration failed after the local
+                        // Room registration succeeded. Remove only the
+                        // newly-created local registration records so a
+                        // failed registration does not leave the username
+                        // or email permanently marked as taken.
+                        repository.rollbackLocalRegistration(user.id)
+
+                        onError(
+                            err.message
+                                ?: "Backend account setup failed"
+                        )
+                    }
             }.onFailure { err ->
-                onError(err.message ?: "Registration failed")
+                onError(
+                    err.message
+                        ?: "Registration failed"
+                )
             }
         }
     }
@@ -164,27 +271,56 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
         onError: (String) -> Unit
     ) {
         viewModelScope.launch {
-            val result = repository.login(usernameOrEmail, pass)
+            val result = repository.login(
+                usernameOrEmail,
+                pass
+            )
+
             result.onSuccess { user ->
                 repository.connectBackendSession(user, pass)
                     .onSuccess {
                         _currentUser.value = user
-                        viewModelScope.launch { repository.refreshP2PFromBackend(); repository.getReferralSummary().onSuccess { _referralSummary.value = it } }
+
+                        viewModelScope.launch {
+                            repository.refreshP2PFromBackend()
+
+                            repository.getReferralSummary()
+                                .onSuccess {
+                                    _referralSummary.value = it
+                                }
+                        }
+
                         onSuccess(user)
                     }
-                    .onFailure { err -> onError(err.message ?: "Backend account setup failed") }
+                    .onFailure { err ->
+                        onError(
+                            err.message
+                                ?: "Backend account setup failed"
+                        )
+                    }
             }.onFailure { err ->
-                onError(err.message ?: "Login failed")
+                onError(
+                    err.message
+                        ?: "Login failed"
+                )
             }
         }
     }
 
     fun refreshReferralSummary() {
-        viewModelScope.launch { repository.getReferralSummary().onSuccess { _referralSummary.value = it } }
+        viewModelScope.launch {
+            repository.getReferralSummary()
+                .onSuccess {
+                    _referralSummary.value = it
+                }
+        }
     }
 
     fun logout() {
-        viewModelScope.launch { repository.disconnectBackendSession() }
+        viewModelScope.launch {
+            repository.disconnectBackendSession()
+        }
+
         _currentUser.value = null
         _referralSummary.value = null
     }
@@ -197,15 +333,23 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             passwordResetService.requestRecovery(email)
                 .onSuccess { response ->
-                    val requestId = response.recoveryRequestId?.takeIf { it.isNotBlank() }
+                    val requestId =
+                        response.recoveryRequestId
+                            ?.takeIf { it.isNotBlank() }
+
                     if (requestId == null) {
-                        onError("Invalid password recovery response")
+                        onError(
+                            "Invalid password recovery response"
+                        )
                     } else {
                         onSuccess(requestId)
                     }
                 }
                 .onFailure { error ->
-                    onError(error.message ?: "Unable to submit password recovery request")
+                    onError(
+                        error.message
+                            ?: "Unable to submit password recovery request"
+                    )
                 }
         }
     }
@@ -216,12 +360,19 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
         onError: (String) -> Unit
     ) {
         viewModelScope.launch {
-            passwordResetService.checkRecoveryStatus(recoveryRequestId)
+            passwordResetService
+                .checkRecoveryStatus(recoveryRequestId)
                 .onSuccess { response ->
-                    onSuccess(response.status ?: "PENDING", response.email)
+                    onSuccess(
+                        response.status ?: "PENDING",
+                        response.email
+                    )
                 }
                 .onFailure { error ->
-                    onError(error.message ?: "Could not check recovery request")
+                    onError(
+                        error.message
+                            ?: "Could not check recovery request"
+                    )
                 }
         }
     }
@@ -239,30 +390,64 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
         }
 
         viewModelScope.launch {
-            passwordResetService.checkRecoveryStatus(recoveryRequestId)
+            passwordResetService
+                .checkRecoveryStatus(recoveryRequestId)
                 .onFailure { error ->
-                    onError(error.message ?: "Could not verify admin approval")
+                    onError(
+                        error.message
+                            ?: "Could not verify admin approval"
+                    )
                 }
                 .onSuccess { statusResponse ->
+
                     if (statusResponse.status != "APPROVED") {
-                        onError("Admin approval is required before changing the password")
+                        onError(
+                            "Admin approval is required before changing the password"
+                        )
                         return@onSuccess
                     }
 
-                    val approvedEmail = statusResponse.email?.trim()?.lowercase()
-                    if (approvedEmail.isNullOrBlank() || approvedEmail != email.trim().lowercase()) {
-                        onError("Recovery request email does not match the account")
+                    val approvedEmail =
+                        statusResponse.email
+                            ?.trim()
+                            ?.lowercase()
+
+                    if (
+                        approvedEmail.isNullOrBlank() ||
+                        approvedEmail != email.trim().lowercase()
+                    ) {
+                        onError(
+                            "Recovery request email does not match the account"
+                        )
                         return@onSuccess
                     }
 
-                    repository.resetPasswordByEmail(approvedEmail, newPassword)
+                    repository
+                        .resetPasswordByEmail(
+                            approvedEmail,
+                            newPassword
+                        )
                         .onSuccess {
-                            passwordResetService.completeRecovery(recoveryRequestId, newPassword)
-                                .onSuccess { onSuccess() }
-                                .onFailure { onError("Password changed, but recovery status could not be completed") }
+
+                            passwordResetService
+                                .completeRecovery(
+                                    recoveryRequestId,
+                                    newPassword
+                                )
+                                .onSuccess {
+                                    onSuccess()
+                                }
+                                .onFailure {
+                                    onError(
+                                        "Password changed, but recovery status could not be completed"
+                                    )
+                                }
                         }
                         .onFailure { error ->
-                            onError(error.message ?: "Password could not be updated")
+                            onError(
+                                error.message
+                                    ?: "Password could not be updated"
+                            )
                         }
                 }
         }
@@ -277,16 +462,30 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
         onError: (String) -> Unit
     ) {
         val user = _currentUser.value
+
         if (user == null) {
-            onError("You must be logged in to submit KYC")
+            onError(
+                "You must be logged in to submit KYC"
+            )
             return
         }
+
         viewModelScope.launch {
-            val result = repository.submitKyc(user.id, fullName, idNumber, documentAttached, documentUri)
+            val result = repository.submitKyc(
+                user.id,
+                fullName,
+                idNumber,
+                documentAttached,
+                documentUri
+            )
+
             result.onSuccess {
                 onSuccess()
             }.onFailure { err ->
-                onError(err.message ?: "KYC submission failed")
+                onError(
+                    err.message
+                        ?: "KYC submission failed"
+                )
             }
         }
     }
@@ -298,16 +497,26 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
         onError: (String) -> Unit
     ) {
         val user = _currentUser.value
+
         if (user == null) {
             onError("Please log in first")
             return
         }
+
         viewModelScope.launch {
-            val result = repository.submitDeposit(user.id, txHash, amount)
+            val result = repository.submitDeposit(
+                user.id,
+                txHash,
+                amount
+            )
+
             result.onSuccess {
                 onSuccess()
             }.onFailure { err ->
-                onError(err.message ?: "Deposit failed")
+                onError(
+                    err.message
+                        ?: "Deposit failed"
+                )
             }
         }
     }
@@ -319,16 +528,26 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
         onError: (String) -> Unit
     ) {
         val user = _currentUser.value
+
         if (user == null) {
             onError("Please log in first")
             return
         }
+
         viewModelScope.launch {
-            val result = repository.submitWithdrawal(user.id, bep20Address, amount)
+            val result = repository.submitWithdrawal(
+                user.id,
+                bep20Address,
+                amount
+            )
+
             result.onSuccess {
                 onSuccess()
             }.onFailure { err ->
-                onError(err.message ?: "Withdrawal request failed")
+                onError(
+                    err.message
+                        ?: "Withdrawal request failed"
+                )
             }
         }
     }
@@ -339,25 +558,50 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
         onError: (String) -> Unit
     ) {
         val user = _currentUser.value
+
         if (user == null) {
             onError("Please log in first")
             return
         }
+
         viewModelScope.launch {
-            val result = repository.claimDailyReward(user.id, rewardAmount)
+            val result =
+                repository.claimDailyReward(
+                    user.id,
+                    rewardAmount
+                )
+
             result.onSuccess { amt ->
                 onSuccess(amt)
             }.onFailure { err ->
-                onError(err.message ?: "Could not claim daily reward")
+                onError(
+                    err.message
+                        ?: "Could not claim daily reward"
+                )
             }
         }
     }
 
-    fun deleteOwnP2PAd(adId: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        val user = _currentUser.value ?: return onError("Please log in first")
+    fun deleteOwnP2PAd(
+        adId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val user = _currentUser.value
+            ?: return onError("Please log in first")
+
         viewModelScope.launch {
-            repository.deleteOwnP2PAd(user.id, adId).onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: "Could not delete advertisement") }
+            repository
+                .deleteOwnP2PAd(user.id, adId)
+                .onSuccess {
+                    onSuccess()
+                }
+                .onFailure {
+                    onError(
+                        it.message
+                            ?: "Could not delete advertisement"
+                    )
+                }
         }
     }
 
@@ -368,51 +612,130 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
         onError: (String) -> Unit
     ) {
         val user = _currentUser.value
+
         if (user == null) {
             onError("Please log in first")
             return
         }
+
         viewModelScope.launch {
-            val result = repository.startP2PTrade(user.id, order.id, orderEtbAmount)
+            val result =
+                repository.startP2PTrade(
+                    user.id,
+                    order.id,
+                    orderEtbAmount
+                )
+
             result.onSuccess { createdOrder ->
                 onSuccess(createdOrder)
             }.onFailure { err ->
-                onError(err.message ?: "Trade initiation failed")
+                onError(
+                    err.message
+                        ?: "Trade initiation failed"
+                )
             }
         }
     }
 
-    fun markP2PPaymentPaid(orderId: String, proofUri: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        val user = _currentUser.value ?: return onError("Please log in first")
+    fun markP2PPaymentPaid(
+        orderId: String,
+        proofUri: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val user = _currentUser.value
+            ?: return onError("Please log in first")
+
         viewModelScope.launch {
-            repository.markP2PPaymentPaid(user.id, orderId, proofUri)
-                .onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: "Could not confirm payment") }
+            repository
+                .markP2PPaymentPaid(
+                    user.id,
+                    orderId,
+                    proofUri
+                )
+                .onSuccess {
+                    onSuccess()
+                }
+                .onFailure {
+                    onError(
+                        it.message
+                            ?: "Could not confirm payment"
+                    )
+                }
         }
     }
 
-    fun releaseP2PEscrow(orderId: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        val user = _currentUser.value ?: return onError("Please log in first")
+    fun releaseP2PEscrow(
+        orderId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val user = _currentUser.value
+            ?: return onError("Please log in first")
+
         viewModelScope.launch {
-            repository.releaseP2PEscrow(user.id, orderId)
-                .onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: "Could not release escrow") }
+            repository
+                .releaseP2PEscrow(
+                    user.id,
+                    orderId
+                )
+                .onSuccess {
+                    onSuccess()
+                }
+                .onFailure {
+                    onError(
+                        it.message
+                            ?: "Could not release escrow"
+                    )
+                }
         }
     }
 
-    fun openP2PDispute(orderId: String, reason: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        val user = _currentUser.value ?: return onError("Please log in first")
+    fun openP2PDispute(
+        orderId: String,
+        reason: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        val user = _currentUser.value
+            ?: return onError("Please log in first")
+
         viewModelScope.launch {
-            repository.openP2PDispute(user.id, orderId, reason).onSuccess { onSuccess() }
-                .onFailure { onError(it.message ?: "Could not open dispute") }
+            repository
+                .openP2PDispute(
+                    user.id,
+                    orderId,
+                    reason
+                )
+                .onSuccess {
+                    onSuccess()
+                }
+                .onFailure {
+                    onError(
+                        it.message
+                            ?: "Could not open dispute"
+                    )
+                }
         }
     }
 
-    fun expireP2POrder(orderId: String, onExpired: () -> Unit = {}, onError: (String) -> Unit = {}) {
+    fun expireP2POrder(
+        orderId: String,
+        onExpired: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
         viewModelScope.launch {
-            repository.expireP2POrderIfUnpaid(orderId)
-                .onSuccess { onExpired() }
-                .onFailure { onError(it.message ?: "Order has not expired yet") }
+            repository
+                .expireP2POrderIfUnpaid(orderId)
+                .onSuccess {
+                    onExpired()
+                }
+                .onFailure {
+                    onError(
+                        it.message
+                            ?: "Order has not expired yet"
+                    )
+                }
         }
     }
 }
