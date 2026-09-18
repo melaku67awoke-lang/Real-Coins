@@ -6,48 +6,38 @@ import retrofit2.http.Body
 import retrofit2.http.POST
 
 interface PasswordResetApi {
-    @POST("v1/password-reset/request")
-    suspend fun requestOtp(@Body request: RequestOtpRequest): Response<RequestOtpResponse>
 
-    @POST("v1/password-reset/verify")
-    suspend fun verifyOtp(@Body request: VerifyOtpRequest): Response<VerifyOtpResponse>
+    @POST("v1/password-recovery/request")
+    suspend fun requestRecovery(
+        @Body request: RecoveryRequest
+    ): Response<RecoveryResponse>
 
-    @POST("v1/password-reset/consume")
-    suspend fun consumeResetAuthorization(@Body request: ConsumeResetAuthorizationRequest): Response<ConsumeResetAuthorizationResponse>
+    @POST("v1/password-recovery/status")
+    suspend fun checkRecoveryStatus(
+        @Body request: RecoveryStatusRequest
+    ): Response<RecoveryStatusResponse>
 }
 
 @JsonClass(generateAdapter = true)
-data class RequestOtpRequest(
+data class RecoveryRequest(
     val email: String
 )
 
 @JsonClass(generateAdapter = true)
-data class RequestOtpResponse(
+data class RecoveryResponse(
     val ok: Boolean,
-    val resetSessionId: String?,
-    val expiresAtMs: Long?
+    val recoveryRequestId: String?,
+    val status: String?
 )
 
 @JsonClass(generateAdapter = true)
-data class VerifyOtpRequest(
-    val resetSessionId: String,
-    val otp: String
+data class RecoveryStatusRequest(
+    val recoveryRequestId: String
 )
 
 @JsonClass(generateAdapter = true)
-data class VerifyOtpResponse(
+data class RecoveryStatusResponse(
     val ok: Boolean,
-    val resetAuthorization: String?,
-    val expiresInSeconds: Long?
-)
-
-@JsonClass(generateAdapter = true)
-data class ConsumeResetAuthorizationRequest(
-    val resetAuthorization: String
-)
-
-@JsonClass(generateAdapter = true)
-data class ConsumeResetAuthorizationResponse(
-    val ok: Boolean,
+    val status: String?,
     val email: String?
 )
