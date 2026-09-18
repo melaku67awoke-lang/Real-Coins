@@ -1,7 +1,7 @@
 const encoder = new TextEncoder();
 
 const PASSWORD_SALT_BYTES = 16;
-const PASSWORD_ITERATIONS = 310000;
+const PASSWORD_ITERATIONS = 100000;
 
 function bytesToBase64(bytes) {
   let binary = '';
@@ -188,12 +188,29 @@ export function generateSessionToken() {
 }
 
 export async function constantTimeSecretEqual(left, right) {
-  if (typeof left !== 'string' || typeof right !== 'string') return false;
-  const leftDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(left)));
-  const rightDigest = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(right)));
+  if (typeof left !== 'string' || typeof right !== 'string') {
+    return false;
+  }
+
+  const leftDigest = new Uint8Array(
+    await crypto.subtle.digest(
+      'SHA-256',
+      encoder.encode(left)
+    )
+  );
+
+  const rightDigest = new Uint8Array(
+    await crypto.subtle.digest(
+      'SHA-256',
+      encoder.encode(right)
+    )
+  );
+
   let difference = 0;
+
   for (let i = 0; i < leftDigest.length; i++) {
     difference |= leftDigest[i] ^ rightDigest[i];
   }
+
   return difference === 0;
 }
