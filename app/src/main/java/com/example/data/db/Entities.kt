@@ -114,8 +114,10 @@ data class LedgerEntryEntity(
     val timestamp: Long = System.currentTimeMillis()
 )
 
-
-@Entity(tableName = "payment_accounts", indices = [Index(value = ["userId"])])
+@Entity(
+    tableName = "payment_accounts",
+    indices = [Index(value = ["userId"])]
+)
 data class PaymentAccountEntity(
     @PrimaryKey val id: String,
     val userId: String,
@@ -157,6 +159,11 @@ data class P2POrderEntity(
     val buyerName: String,
     val cryptoAmount: Double,
     val fiatPrice: Double,
+
+    // ETB amount actually traded for this P2P order.
+    // Required by RealCoinRepository and RealCoinScreens.
+    val fiatOrderAmount: Double = 0.0,
+
     val fiatCurrency: String = "ETB",
     val paymentMethod: String,
     val paymentName: String = "",
@@ -172,7 +179,6 @@ data class P2POrderEntity(
     val resolvedAt: Long? = null,
     val resolvedByAdminId: String? = null
 )
-
 
 @Entity(tableName = "spin_states")
 data class SpinStateEntity(
@@ -217,7 +223,6 @@ data class PasswordResetSessionEntity(
     val usedAt: Long? = null
 )
 
-
 @Entity(tableName = "help_requests")
 data class HelpRequestEntity(
     @PrimaryKey val id: String,
@@ -229,7 +234,6 @@ data class HelpRequestEntity(
     val resolvedAt: Long? = null,
     val resolvedByAdminId: String? = null
 )
-
 
 @Entity(
     tableName = "p2p_chat_messages",
