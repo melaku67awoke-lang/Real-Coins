@@ -1,8 +1,0 @@
-RealCoin v30 final release preparation
-
-- versionCode 30 / versionName 30.0
-- Release build explicitly non-debuggable.
-- Release R8/minification enabled.
-- Release signing configuration remains environment/keystore based.
-- No release APK was fabricated: this archive is the Android Studio project.
-- A signed release APK/AAB requires the real release keystore credentials and a successful Gradle build/test.
