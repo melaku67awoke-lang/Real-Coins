@@ -1,15 +1,13 @@
 package com.example.data.db
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
-import androidx.room.Update
+import androidx.room.*
 import kotlinx.coroutines.flow.Flow
+
+
+
 
 @Dao
 interface PasswordResetSessionDao {
-
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(session: PasswordResetSessionEntity)
 
@@ -25,26 +23,20 @@ interface PasswordResetSessionDao {
 
 @Dao
 interface PaymentAccountDao {
-
     @Query("SELECT * FROM payment_accounts WHERE userId = :userId ORDER BY createdAt DESC")
     fun getForUser(userId: String): Flow<List<PaymentAccountEntity>>
-
     @Query("SELECT * FROM payment_accounts WHERE id = :id AND userId = :userId LIMIT 1")
     suspend fun getOwned(id: String, userId: String): PaymentAccountEntity?
-
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(account: PaymentAccountEntity)
-
     @Query("SELECT COUNT(*) FROM payment_accounts WHERE userId = :userId")
     suspend fun countForUser(userId: String): Int
-
     @Query("DELETE FROM payment_accounts WHERE id = :id AND userId = :userId")
     suspend fun deleteOwned(id: String, userId: String): Int
 }
 
 @Dao
 interface UserDao {
-
     @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
     suspend fun getUserById(id: String): UserEntity?
 
@@ -58,11 +50,7 @@ interface UserDao {
     suspend fun insertUser(user: UserEntity)
 
     @Query("UPDATE users SET passwordHash = :passwordHash, passwordSalt = :passwordSalt WHERE id = :userId")
-    suspend fun updatePassword(
-        userId: String,
-        passwordHash: String,
-        passwordSalt: String
-    ): Int
+    suspend fun updatePassword(userId: String, passwordHash: String, passwordSalt: String): Int
 
     @Query("SELECT COUNT(*) FROM users WHERE role = 'USER'")
     suspend fun countUsers(): Int
@@ -70,7 +58,6 @@ interface UserDao {
 
 @Dao
 interface WalletDao {
-
     @Query("SELECT * FROM wallets WHERE userId = :userId LIMIT 1")
     fun getWallet(userId: String): Flow<WalletEntity?>
 
@@ -86,7 +73,6 @@ interface WalletDao {
 
 @Dao
 interface KycDao {
-
     @Query("SELECT * FROM kyc_records WHERE userId = :userId LIMIT 1")
     fun getKycForUser(userId: String): Flow<KycEntity?>
 
@@ -114,7 +100,6 @@ interface KycDao {
 
 @Dao
 interface DepositDao {
-
     @Query("SELECT * FROM deposits WHERE txHash = :txHash LIMIT 1")
     suspend fun getDepositByTxHash(txHash: String): DepositEntity?
 
@@ -142,7 +127,6 @@ interface DepositDao {
 
 @Dao
 interface WithdrawalDao {
-
     @Query("SELECT * FROM withdrawals WHERE id = :id LIMIT 1")
     suspend fun getWithdrawalById(id: String): WithdrawalEntity?
 
@@ -164,7 +148,6 @@ interface WithdrawalDao {
 
 @Dao
 interface LedgerDao {
-
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertLedgerEntry(entry: LedgerEntryEntity)
 
@@ -177,6 +160,117 @@ interface LedgerDao {
 
 @Dao
 interface P2PDao {
+    @Query("SELECT * FROM p2p_ads WHERE isActive = 1 ORDER BY createdAt DESC")
+    fun getActiveAds(): Flow<List<P2PAdEntity>>
+
+    @Query("SELECT * FROM p2p_ads WHERE sellerId = :userId AND isActive = 1 ORDER BY createdAt DESC")
+    fun getActiveAdsForUser(userId: String): Flow<List<P2PAdEntity>>
+
+    @Query("UPDATE p2p_ads SET isActive = 0 WHERE id = :adId AND sellerId = :userId AND isActive = 1")
+    suspend fun deactivateOwnedAd(adId: String, userId: String): Int
 
     @Query("SELECT * FROM p2p_ads WHERE isActive = 1 ORDER BY createdAt DESC")
-    fun getActiveAds():
+    suspend fun getActiveAdsSync(): List<P2PAdEntity>
+
+    @Query("SELECT * FROM p2p_ads WHERE id = :id LIMIT 1")
+    suspend fun getAdById(id: String): P2PAdEntity?
+
+    @Query("UPDATE p2p_ads SET isActive = 0 WHERE isActive = 1")
+    suspend fun deactivateAllAds()
+
+    @Query("DELETE FROM p2p_orders")
+    suspend fun clearOrders()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAd(ad: P2PAdEntity)
+
+    @Update
+    suspend fun updateAd(ad: P2PAdEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrder(order: P2POrderEntity)
+
+    @Update
+    suspend fun updateOrder(order: P2POrderEntity)
+
+    @Query("SELECT * FROM p2p_orders WHERE id = :id LIMIT 1")
+    suspend fun getOrderById(id: String): P2POrderEntity?
+
+    @Query("SELECT * FROM p2p_orders WHERE sellerId = :userId OR buyerId = :userId ORDER BY createdAt DESC")
+    fun getOrdersForUser(userId: String): Flow<List<P2POrderEntity>>
+
+    @Query("SELECT * FROM p2p_orders WHERE sellerId = :userId OR buyerId = :userId ORDER BY createdAt DESC")
+    suspend fun getOrdersForUserSync(userId: String): List<P2POrderEntity>
+
+    @Query("SELECT COUNT(*) FROM p2p_orders WHERE adId = :adId AND status IN ('ESCROW_LOCKED', 'PAID', 'DISPUTED')")
+    suspend fun countOpenOrdersForAd(adId: String): Int
+
+    @Query("SELECT * FROM p2p_orders WHERE status = 'DISPUTED' ORDER BY createdAt DESC")
+    fun getDisputedOrders(): Flow<List<P2POrderEntity>>
+}
+
+@Dao
+interface SpinStateDao {
+    @Query("SELECT * FROM spin_states WHERE userId = :userId LIMIT 1")
+    suspend fun get(userId: String): SpinStateEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(state: SpinStateEntity)
+}
+
+@Dao
+interface RewardDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertRewardClaim(claim: RewardClaimEntity)
+
+    @Query("SELECT * FROM reward_claims WHERE userId = :userId AND periodKey = :periodKey LIMIT 1")
+    suspend fun getClaimForPeriod(userId: String, periodKey: String): RewardClaimEntity?
+
+    @Query("SELECT * FROM reward_claims WHERE userId = :userId ORDER BY claimTimestamp DESC")
+    suspend fun getClaimsForUser(userId: String): List<RewardClaimEntity>
+}
+
+
+@Dao
+interface AppSettingsDao {
+    @Query("SELECT * FROM app_settings WHERE `key` = :key LIMIT 1")
+    suspend fun get(key: String): AppSettingEntity?
+
+    @Query("SELECT * FROM app_settings WHERE `key` = :key LIMIT 1")
+    fun observe(key: String): Flow<AppSettingEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(setting: AppSettingEntity)
+}
+
+
+@Dao
+interface HelpRequestDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(request: HelpRequestEntity)
+
+    @Query("SELECT * FROM help_requests WHERE userId = :userId ORDER BY createdAt DESC")
+    fun getForUser(userId: String): Flow<List<HelpRequestEntity>>
+
+    @Query("SELECT * FROM help_requests WHERE status = 'PENDING' ORDER BY createdAt ASC")
+    fun getPending(): Flow<List<HelpRequestEntity>>
+
+    @Query("SELECT * FROM help_requests WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): HelpRequestEntity?
+
+    @Update
+    suspend fun update(request: HelpRequestEntity)
+}
+
+
+@Dao
+interface P2PChatDao {
+    @Query("SELECT * FROM p2p_chat_messages WHERE orderId = :orderId ORDER BY createdAt ASC")
+    fun getForOrder(orderId: String): Flow<List<P2PChatMessageEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insert(message: P2PChatMessageEntity)
+
+    @Query("DELETE FROM p2p_chat_messages WHERE orderId = :orderId")
+    suspend fun deleteForOrder(orderId: String)
+}
