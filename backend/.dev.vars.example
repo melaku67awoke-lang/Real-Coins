@@ -1,0 +1,2 @@
+# Local development only. Never commit real values.
+RATE_LIMIT_SECRET="replace_with_a_random_32_byte_secret"

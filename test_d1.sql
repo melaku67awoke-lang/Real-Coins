@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS rate_limits (email_key TEXT PRIMARY KEY, window_ends_at_ms INTEGER NOT NULL, count INTEGER NOT NULL);
+INSERT INTO rate_limits(email_key, window_ends_at_ms, count) VALUES ('a',1000,1) ON CONFLICT(email_key) DO UPDATE SET count=CASE WHEN 500 >= rate_limits.window_ends_at_ms THEN 1 WHEN rate_limits.count < 3 THEN rate_limits.count+1 ELSE rate_limits.count END, window_ends_at_ms=CASE WHEN 500 >= rate_limits.window_ends_at_ms THEN 1500 ELSE rate_limits.window_ends_at_ms END;

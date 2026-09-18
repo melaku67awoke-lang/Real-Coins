@@ -1,0 +1,42 @@
+RealCoin v30 fix report
+=======================
+
+Scope
+-----
+Code/project configuration and tests only. No UI source/resource files were changed.
+
+Fixes applied
+-------------
+1. Restored the production USDT BEP-20 contract configuration:
+   0x55d398326f99059fF775485246999027B3197955
+2. Kept submitDeposit() in the PENDING state and ensured it does not credit spendable balance.
+3. Corrected the duplicate-TxHash test so a duplicate rejected after a pending submission does not expect funds.
+4. Added an explicit pending-deposit test.
+5. Added a test-source-only trusted confirmed-deposit fixture for tests that legitimately require funds.
+   It inserts a CONFIRMED deposit, credits the test wallet, and records a DEPOSIT ledger entry.
+   No production test-funding/backdoor method was added.
+6. Updated withdrawal, P2P, and cross-user tests to use the trusted confirmed fixture rather than treating
+   submitDeposit() as immediately spendable.
+7. Corrected the cross-user privacy assertion to verify deposit ownership instead of assuming every deposit
+   must appear as a ledger entry from submitDeposit().
+
+UI verification
+---------------
+Compared against the supplied BUGFIXED archive: no files under app/src/main/res or app/src/main/java/com/example/ui
+(or MainActivity.kt) differ. Only app/build.gradle.kts and the comprehensive unit-test file were changed.
+
+Build/test verification
+-----------------------
+Not executed in this environment. The supplied project has gradle-wrapper.properties but is missing the
+Gradle wrapper scripts/JAR, and this environment has no Android SDK/Gradle installation. Therefore this report
+makes no claim that assembleDebug or testDebugUnitTest passed.
+
+The stale .build-outputs/app-debug.apk from the supplied archive was removed so it cannot be mistaken for a
+freshly verified build artifact.
+
+Cloud build preparation
+-----------------------
+Added .github/workflows/android.yml for phone-only GitHub Actions builds.
+The workflow provisions JDK 17 and Gradle 9.3.1, installs Android SDK packages, generates the missing Gradle wrapper,
+runs testDebugUnitTest, runs assembleDebug, and uploads the debug APK only after a successful job.
+This workflow addition does not modify UI source or resources.

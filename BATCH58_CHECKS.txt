@@ -1,0 +1,15 @@
+BATCH 58 CHECKS
+
+Deposit / Withdrawal BEP20 update:
+- Deposit address set to 0x8e54105bed3243e1ca44a0cccc6b62cf2bff9df4
+- BEP20/BSC-only warning shown for both deposit and withdrawal
+- Deposit address has copy-to-clipboard control
+- Minimum deposit remains $25 USD
+- Minimum withdrawal remains $50 USD
+- Withdrawal amount is entered in RC
+- Withdrawal receiving address accepts/pastes a BEP20 address
+- Withdrawal address validation requires 0x + 40 hexadecimal characters
+- Repository-level minimum deposit validation added
+- Repository-level withdrawal BEP20 address validation tightened
+- USD/ETB calculation constant remains 1 USD = 186 ETB
+- Android APK build not run locally because Gradle wrapper executable/JAR is absent in this ZIP
