@@ -566,6 +566,24 @@ class RealCoinRepository(private val db: AppDatabase, context: Context) {
         }
     }
 
+    /**
+     * Removes the local records created for a brand-new registration
+     * when backend account setup fails.
+     *
+     * This is intentionally separate from connectBackendSession()
+     * so an existing local user is never deleted just because a
+     * backend login/connection fails.
+     */
+    suspend fun rollbackLocalRegistration(
+        userId: String
+    ) {
+        db.withTransaction {
+            kycDao.deleteKycByUserId(userId)
+            walletDao.deleteWalletByUserId(userId)
+            userDao.deleteUserById(userId)
+        }
+    }
+
     suspend fun login(
         usernameOrEmail: String,
         password: String
