@@ -19,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
@@ -38,7 +39,7 @@ import com.example.model.UserProfile
 import com.example.data.repository.RealCoinRepository
 
 // -------------------------------------------------------------
-// LANDING PAGE (Untouched UI / layout preserved)
+// LANDING PAGE
 // -------------------------------------------------------------
 @Composable
 fun LandingScreen(
@@ -85,7 +86,10 @@ fun LandingScreen(
 
         Button(
             onClick = onNavigateToLogin,
-            modifier = Modifier.fillMaxWidth().height(52.dp).testTag("get_started_button")
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .testTag("get_started_button")
         ) {
             Text("Login to Wallet", fontSize = 16.sp)
         }
@@ -94,7 +98,10 @@ fun LandingScreen(
 
         OutlinedButton(
             onClick = onNavigateToRegister,
-            modifier = Modifier.fillMaxWidth().height(52.dp).testTag("register_nav_button")
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+                .testTag("register_nav_button")
         ) {
             Text("Create New Account", fontSize = 16.sp)
         }
@@ -102,7 +109,7 @@ fun LandingScreen(
 }
 
 // -------------------------------------------------------------
-// LOGIN PAGE (Preserves visual consistency)
+// LOGIN PAGE
 // -------------------------------------------------------------
 @Composable
 fun LoginScreen(
@@ -121,8 +128,17 @@ fun LoginScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        Text("Login to Wallet", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Enter your credentials to access RealCoin", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "Login to Wallet",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            "Enter your credentials to access RealCoin",
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodyMedium
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -130,15 +146,21 @@ fun LoginScreen(
             value = usernameOrEmail,
             onValueChange = { usernameOrEmail = it },
             label = { Text("Username or Email") },
-            modifier = Modifier.fillMaxWidth().testTag("login_username_input")
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("login_username_input")
         )
+
         Spacer(modifier = Modifier.height(12.dp))
+
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth().testTag("login_password_input")
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("login_password_input")
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -148,10 +170,17 @@ fun LoginScreen(
                 if (usernameOrEmail.isNotBlank() && password.isNotBlank()) {
                     onLoginSubmit(usernameOrEmail.trim(), password)
                 } else {
-                    Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Please fill in all fields",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             },
-            modifier = Modifier.fillMaxWidth().height(50.dp).testTag("login_submit_button")
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .testTag("login_submit_button")
         ) {
             Text("Login")
         }
@@ -160,43 +189,64 @@ fun LoginScreen(
 
         TextButton(
             onClick = onNavigateToForgotPassword,
-            modifier = Modifier.align(Alignment.CenterHorizontally).testTag("forgot_password_button")
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .testTag("forgot_password_button")
         ) {
             Text("Forgot Password?")
         }
 
-        TextButton(onClick = onNavigateToRegister, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+        TextButton(
+            onClick = onNavigateToRegister,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ) {
             Text("Don't have an account? Register")
         }
 
-        TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+        TextButton(
+            onClick = onBack,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ) {
             Text("Back to Welcome")
         }
     }
 }
 
 // -------------------------------------------------------------
-// FORGOT PASSWORD ENTRY (Step 13: navigation only)
+// FORGOT PASSWORD — ADMIN VERIFICATION
 // -------------------------------------------------------------
 @Composable
 fun ForgotPasswordEntryScreen(
-    onRequestOtp: (email: String, onSuccess: (resetSessionId: String, expiresAtMs: Long?) -> Unit, onError: (String) -> Unit) -> Unit,
-    onVerifyOtp: (resetSessionId: String, otp: String, onSuccess: (resetAuthorization: String, expiresInSeconds: Long?) -> Unit, onError: (String) -> Unit) -> Unit,
-    onResetPassword: (email: String, resetAuthorization: String, newPassword: String, onSuccess: () -> Unit, onError: (String) -> Unit) -> Unit,
+    onRequestRecovery: (
+        email: String,
+        onSuccess: (recoveryRequestId: String) -> Unit,
+        onError: (String) -> Unit
+    ) -> Unit,
+    onCheckRecoveryStatus: (
+        recoveryRequestId: String,
+        onSuccess: (status: String, email: String?) -> Unit,
+        onError: (String) -> Unit
+    ) -> Unit,
+    onResetPassword: (
+        email: String,
+        newPassword: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+
     var email by remember { mutableStateOf("") }
-    var resetSessionId by remember { mutableStateOf<String?>(null) }
-    var resetAuthorization by remember { mutableStateOf<String?>(null) }
-    var otp by remember { mutableStateOf("") }
+    var recoveryRequestId by remember { mutableStateOf<String?>(null) }
+    var recoveryStatus by remember { mutableStateOf("NONE") }
+
     var isSubmitting by remember { mutableStateOf(false) }
-    var isVerifying by remember { mutableStateOf(false) }
-    var codeSent by remember { mutableStateOf(false) }
-    var verificationComplete by remember { mutableStateOf(false) }
+    var isChecking by remember { mutableStateOf(false) }
+    var isResetting by remember { mutableStateOf(false) }
+
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var isResetting by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -209,11 +259,23 @@ fun ForgotPasswordEntryScreen(
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
+
         Text(
-            when {
-                verificationComplete -> "Your email was verified. You can continue to set a new password."
-                codeSent -> "Enter the 6-digit confirmation code sent to your email."
-                else -> "Enter the email address registered with your RealCoin account."
+            when (recoveryStatus) {
+                "PENDING" ->
+                    "Your recovery request is waiting for admin verification."
+
+                "APPROVED" ->
+                    "Your recovery request was approved. You can now create a new password."
+
+                "REJECTED" ->
+                    "Your recovery request was rejected. You can submit a new request."
+
+                "COMPLETED" ->
+                    "Your password has been changed."
+
+                else ->
+                    "Enter the email address registered with your RealCoin account."
             },
             color = Color.Gray,
             style = MaterialTheme.typography.bodyMedium
@@ -224,142 +286,251 @@ fun ForgotPasswordEntryScreen(
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            enabled = !isSubmitting && !codeSent,
+            enabled = !isSubmitting &&
+                !isResetting &&
+                recoveryStatus !in setOf("PENDING", "APPROVED"),
             label = { Text("Registered Email") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email
+            ),
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().testTag("forgot_password_email_input")
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("forgot_password_email_input")
         )
-
-        if (codeSent) {
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(
-                value = otp,
-                onValueChange = { value ->
-                    otp = value.filter(Char::isDigit).take(6)
-                },
-                enabled = !isVerifying && !verificationComplete,
-                label = { Text("Confirmation Code") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().testTag("forgot_password_otp_input")
-            )
-        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (!codeSent) {
-            Button(
-                onClick = {
-                    isSubmitting = true
-                    onRequestOtp(
-                        email.trim(),
-                        { sessionId, _ ->
-                            resetSessionId = sessionId
-                            isSubmitting = false
-                            codeSent = true
-                            Toast.makeText(context, "Confirmation code sent. Check your email.", Toast.LENGTH_LONG).show()
-                        },
-                        { error ->
-                            isSubmitting = false
-                            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-                        }
-                    )
-                },
-                enabled = email.isNotBlank() && !isSubmitting,
-                modifier = Modifier.fillMaxWidth().height(50.dp).testTag("forgot_password_request_button")
-            ) {
-                Text(if (isSubmitting) "Sending..." else "Send Confirmation Code")
-            }
-        } else if (!verificationComplete) {
-            Button(
-                onClick = {
-                    val sessionId = resetSessionId ?: return@Button
-                    isVerifying = true
-                    onVerifyOtp(
-                        sessionId,
-                        otp,
-                        { authorization, _ ->
-                            // Keep the short-lived authorization only in memory for the next reset stage.
-                            resetAuthorization = authorization
-                            isVerifying = false
-                            verificationComplete = true
-                            Toast.makeText(context, "Code verified successfully.", Toast.LENGTH_LONG).show()
-                        },
-                        { error ->
-                            isVerifying = false
-                            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
-                        }
-                    )
-                },
-                enabled = otp.length == 6 && !isVerifying && resetSessionId != null,
-                modifier = Modifier.fillMaxWidth().height(50.dp).testTag("forgot_password_verify_button")
-            ) {
-                Text(if (isVerifying) "Verifying..." else "Verify Confirmation Code")
-            }
-        } else {
-            Text(
-                "Create a new password for your RealCoin account.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.testTag("forgot_password_verified_message")
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(
-                value = newPassword,
-                onValueChange = { newPassword = it },
-                enabled = !isResetting,
-                label = { Text("New Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().testTag("forgot_password_new_password_input")
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(
-                value = confirmPassword,
-                onValueChange = { confirmPassword = it },
-                enabled = !isResetting,
-                label = { Text("Confirm New Password") },
-                visualTransformation = PasswordVisualTransformation(),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().testTag("forgot_password_confirm_password_input")
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = {
-                    if (newPassword.length < 6) {
-                        Toast.makeText(context, "Password must be at least 6 characters.", Toast.LENGTH_LONG).show()
-                    } else if (newPassword != confirmPassword) {
-                        Toast.makeText(context, "Passwords do not match.", Toast.LENGTH_LONG).show()
-                    } else {
-                        val authorization = resetAuthorization
-                        if (authorization.isNullOrBlank()) {
-                            Toast.makeText(context, "Password reset authorization is missing. Please start again.", Toast.LENGTH_LONG).show()
-                            return@Button
-                        }
-                        isResetting = true
-                        onResetPassword(
+        when (recoveryStatus) {
+
+            "NONE", "REJECTED" -> {
+                Button(
+                    onClick = {
+                        isSubmitting = true
+
+                        onRequestRecovery(
                             email.trim(),
-                            authorization,
-                            newPassword,
-                            {
-                                newPassword = ""
-                                confirmPassword = ""
-                                resetAuthorization = null
-                                isResetting = false
-                                Toast.makeText(context, "Password changed successfully. Please log in.", Toast.LENGTH_LONG).show()
-                                onBack()
+                            { requestId ->
+                                recoveryRequestId = requestId
+                                recoveryStatus = "PENDING"
+                                isSubmitting = false
+
+                                Toast.makeText(
+                                    context,
+                                    "Recovery request submitted. Please wait for admin verification.",
+                                    Toast.LENGTH_LONG
+                                ).show()
                             },
                             { error ->
-                                isResetting = false
-                                Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                                isSubmitting = false
+
+                                Toast.makeText(
+                                    context,
+                                    error,
+                                    Toast.LENGTH_LONG
+                                ).show()
                             }
                         )
-                    }
-                },
-                enabled = !isResetting && newPassword.isNotEmpty() && confirmPassword.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth().height(50.dp).testTag("forgot_password_reset_button")
-            ) {
-                Text(if (isResetting) "Changing Password..." else "Change Password")
+                    },
+                    enabled = email.isNotBlank() && !isSubmitting,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("forgot_password_request_button")
+                ) {
+                    Text(
+                        if (isSubmitting)
+                            "Submitting..."
+                        else
+                            "Request Password Recovery"
+                    )
+                }
+            }
+
+            "PENDING" -> {
+                Text(
+                    "Request ID: ${recoveryRequestId ?: "Unknown"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = {
+                        val requestId =
+                            recoveryRequestId ?: return@Button
+
+                        isChecking = true
+
+                        onCheckRecoveryStatus(
+                            requestId,
+                            { status, returnedEmail ->
+                                recoveryStatus = status
+
+                                if (!returnedEmail.isNullOrBlank()) {
+                                    email = returnedEmail
+                                }
+
+                                isChecking = false
+
+                                Toast.makeText(
+                                    context,
+                                    when (status) {
+                                        "APPROVED" ->
+                                            "Your recovery request was approved."
+
+                                        "REJECTED" ->
+                                            "Your recovery request was rejected."
+
+                                        else ->
+                                            "Your request is still waiting for admin verification."
+                                    },
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            },
+                            { error ->
+                                isChecking = false
+
+                                Toast.makeText(
+                                    context,
+                                    error,
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        )
+                    },
+                    enabled = !isChecking &&
+                        recoveryRequestId != null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                ) {
+                    Text(
+                        if (isChecking)
+                            "Checking..."
+                        else
+                            "Check Admin Approval"
+                    )
+                }
+            }
+
+            "APPROVED" -> {
+                Text(
+                    "Create a new password for your RealCoin account.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.testTag(
+                        "forgot_password_approved_message"
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = newPassword,
+                    onValueChange = { newPassword = it },
+                    enabled = !isResetting,
+                    label = { Text("New Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(
+                            "forgot_password_new_password_input"
+                        )
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = {
+                        confirmPassword = it
+                    },
+                    enabled = !isResetting,
+                    label = { Text("Confirm New Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag(
+                            "forgot_password_confirm_password_input"
+                        )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        if (newPassword.length < 8) {
+                            Toast.makeText(
+                                context,
+                                "Password must be at least 8 characters.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else if (newPassword != confirmPassword) {
+                            Toast.makeText(
+                                context,
+                                "Passwords do not match.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } else {
+                            isResetting = true
+
+                            onResetPassword(
+                                email.trim(),
+                                newPassword,
+                                {
+                                    newPassword = ""
+                                    confirmPassword = ""
+                                    recoveryRequestId = null
+                                    recoveryStatus = "COMPLETED"
+                                    isResetting = false
+
+                                    Toast.makeText(
+                                        context,
+                                        "Password changed successfully. Please log in.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+
+                                    onBack()
+                                },
+                                { error ->
+                                    isResetting = false
+
+                                    Toast.makeText(
+                                        context,
+                                        error,
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            )
+                        }
+                    },
+                    enabled = !isResetting &&
+                        newPassword.isNotEmpty() &&
+                        confirmPassword.isNotEmpty(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag(
+                            "forgot_password_reset_button"
+                        )
+                ) {
+                    Text(
+                        if (isResetting)
+                            "Changing Password..."
+                        else
+                            "Change Password"
+                    )
+                }
+            }
+
+            "COMPLETED" -> {
+                Text(
+                    "Password recovery completed.",
+                    color = Color(0xFF2E7D32)
+                )
             }
         }
 
@@ -375,7 +546,7 @@ fun ForgotPasswordEntryScreen(
 }
 
 // -------------------------------------------------------------
-// REGISTRATION PAGE (Layout preserved)
+// REGISTRATION PAGE
 // -------------------------------------------------------------
 @Composable
 fun RegisterScreen(
@@ -393,8 +564,17 @@ fun RegisterScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        Text("Create Account", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Join the RealCoin ecosystem", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "Create Account",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            "Join the RealCoin ecosystem",
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodyMedium
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -402,55 +582,89 @@ fun RegisterScreen(
             value = username,
             onValueChange = { username = it },
             label = { Text("Username") },
-            modifier = Modifier.fillMaxWidth().testTag("register_username_input")
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("register_username_input")
         )
+
         Spacer(modifier = Modifier.height(12.dp))
+
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
             label = { Text("Email") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            modifier = Modifier.fillMaxWidth().testTag("register_email_input")
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("register_email_input")
         )
+
         Spacer(modifier = Modifier.height(12.dp))
+
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth().testTag("register_password_input")
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("register_password_input")
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
         Button(
             onClick = {
-                if (username.isNotBlank() && email.isNotBlank() && password.isNotBlank()) {
-                    onRegisterSuccess(username.trim(), email.trim(), password)
+                if (
+                    username.isNotBlank() &&
+                    email.isNotBlank() &&
+                    password.isNotBlank()
+                ) {
+                    onRegisterSuccess(
+                        username.trim(),
+                        email.trim(),
+                        password
+                    )
                 } else {
-                    Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Please fill in all fields",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             },
-            modifier = Modifier.fillMaxWidth().height(50.dp).testTag("register_submit_button")
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .testTag("register_submit_button")
         ) {
             Text("Register")
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+        TextButton(
+            onClick = onBack,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ) {
             Text("Already have an account? Log In")
         }
     }
 }
 
 // -------------------------------------------------------------
-// KYC VERIFICATION SCREEN (Layout preserved)
+// KYC VERIFICATION SCREEN
 // -------------------------------------------------------------
 @Composable
 fun KYCScreen(
     kycStatus: String = "NOT_SUBMITTED",
-    onKYCSubmitted: (fullName: String, idNumber: String, documentAttached: Boolean) -> Unit
+    onKYCSubmitted: (
+        fullName: String,
+        idNumber: String,
+        documentAttached: Boolean
+    ) -> Unit
 ) {
     val context = LocalContext.current
     var fullName by remember { mutableStateOf("") }
@@ -463,13 +677,25 @@ fun KYCScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        Text("KYC Identity Verification", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(
+            "KYC Identity Verification",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
         Text(
             text = when (kycStatus) {
-                "PENDING" -> "Waiting for admin verification. You cannot enter the main app until KYC is approved."
-                "REJECTED" -> "Your KYC was rejected. Please review your information and submit again."
-                "VERIFIED" -> "Your KYC is approved."
-                else -> "Verify your identity to unlock higher limits"
+                "PENDING" ->
+                    "Waiting for admin verification. You cannot enter the main app until KYC is approved."
+
+                "REJECTED" ->
+                    "Your KYC was rejected. Please review your information and submit again."
+
+                "VERIFIED" ->
+                    "Your KYC is approved."
+
+                else ->
+                    "Verify your identity to unlock higher limits"
             },
             color = when (kycStatus) {
                 "PENDING" -> Color(0xFFF57F17)
@@ -482,10 +708,17 @@ fun KYCScreen(
 
         if (kycStatus == "PENDING" || kycStatus == "VERIFIED") {
             Spacer(modifier = Modifier.height(16.dp))
+
             Text(
-                text = if (kycStatus == "PENDING") "Status: Pending admin review" else "Status: Approved",
+                text = if (kycStatus == "PENDING")
+                    "Status: Pending admin review"
+                else
+                    "Status: Approved",
                 fontWeight = FontWeight.Bold,
-                color = if (kycStatus == "PENDING") Color(0xFFF57F17) else Color(0xFF2E7D32)
+                color = if (kycStatus == "PENDING")
+                    Color(0xFFF57F17)
+                else
+                    Color(0xFF2E7D32)
             )
         }
 
@@ -494,9 +727,12 @@ fun KYCScreen(
         OutlinedTextField(
             value = fullName,
             onValueChange = { fullName = it },
-            enabled = kycStatus != "PENDING" && kycStatus != "VERIFIED",
+            enabled = kycStatus != "PENDING" &&
+                kycStatus != "VERIFIED",
             label = { Text("Full Legal Name") },
-            modifier = Modifier.fillMaxWidth().testTag("kyc_fullname_input")
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("kyc_fullname_input")
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -504,9 +740,12 @@ fun KYCScreen(
         OutlinedTextField(
             value = idNumber,
             onValueChange = { idNumber = it },
-            enabled = kycStatus != "PENDING" && kycStatus != "VERIFIED",
+            enabled = kycStatus != "PENDING" &&
+                kycStatus != "VERIFIED",
             label = { Text("Government ID / Passport Number") },
-            modifier = Modifier.fillMaxWidth().testTag("kyc_id_input")
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("kyc_id_input")
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -514,27 +753,53 @@ fun KYCScreen(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = kycStatus != "PENDING" && kycStatus != "VERIFIED") {
+                .clickable(
+                    enabled = kycStatus != "PENDING" &&
+                        kycStatus != "VERIFIED"
+                ) {
                     uploadedDoc = true
-                    Toast.makeText(context, "Document selected", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Document selected",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
-                .border(1.dp, if (uploadedDoc) Color(0xFF2E7D32) else Color.LightGray, RoundedCornerShape(10.dp)),
+                .border(
+                    1.dp,
+                    if (uploadedDoc)
+                        Color(0xFF2E7D32)
+                    else
+                        Color.LightGray,
+                    RoundedCornerShape(10.dp)
+                ),
             shape = RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            color = MaterialTheme.colorScheme.surfaceVariant
+                .copy(alpha = 0.4f)
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
-                    imageVector = if (uploadedDoc) Icons.Default.CheckCircle else Icons.Default.UploadFile,
+                    imageVector = if (uploadedDoc)
+                        Icons.Default.CheckCircle
+                    else
+                        Icons.Default.UploadFile,
                     contentDescription = "Upload",
-                    tint = if (uploadedDoc) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
+                    tint = if (uploadedDoc)
+                        Color(0xFF2E7D32)
+                    else
+                        MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(36.dp)
                 )
+
                 Spacer(modifier = Modifier.height(8.dp))
+
                 Text(
-                    text = if (uploadedDoc) "ID Document Attached ✓" else "Tap to upload National ID / Passport",
+                    text = if (uploadedDoc)
+                        "ID Document Attached ✓"
+                    else
+                        "Tap to upload National ID / Passport",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
@@ -544,15 +809,31 @@ fun KYCScreen(
         Spacer(modifier = Modifier.height(28.dp))
 
         Button(
-            enabled = kycStatus != "PENDING" && kycStatus != "VERIFIED",
+            enabled = kycStatus != "PENDING" &&
+                kycStatus != "VERIFIED",
             onClick = {
-                if (fullName.isNotBlank() && idNumber.isNotBlank() && uploadedDoc) {
-                    onKYCSubmitted(fullName.trim(), idNumber.trim(), uploadedDoc)
+                if (
+                    fullName.isNotBlank() &&
+                    idNumber.isNotBlank() &&
+                    uploadedDoc
+                ) {
+                    onKYCSubmitted(
+                        fullName.trim(),
+                        idNumber.trim(),
+                        uploadedDoc
+                    )
                 } else {
-                    Toast.makeText(context, "Please complete all fields and attach ID", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Please complete all fields and attach ID",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             },
-            modifier = Modifier.fillMaxWidth().height(50.dp).testTag("kyc_submit_button")
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .testTag("kyc_submit_button")
         ) {
             Text("Submit for Verification")
         }
@@ -560,7 +841,7 @@ fun KYCScreen(
 }
 
 // -------------------------------------------------------------
-// HOME DASHBOARD (With RealCoin balance, ticker, BEP-20 notice)
+// HOME DASHBOARD
 // -------------------------------------------------------------
 @Composable
 fun HomeScreen(
@@ -570,26 +851,29 @@ fun HomeScreen(
     onOpenDeposit: () -> Unit,
     onOpenWithdraw: () -> Unit
 ) {
-    val realCoinUsd = userProfile.realCoinBalance * realCoinUsdPrice
+    val realCoinUsd =
+        userProfile.realCoinBalance * realCoinUsdPrice
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(vertical = 16.dp)
     ) {
-        // Warning Banner
         item {
             WarningNoticeBox(
                 message = "Notice: Users must use BEP-20 (BNB Smart Chain) address only for both Deposit and withdrawals. Min withdrawal is $50 USD."
             )
         }
 
-        // Wallet Balance Card
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary)
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp)
@@ -601,18 +885,24 @@ fun HomeScreen(
                     ) {
                         Text(
                             text = "RealCoin Wallet",
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                            color = MaterialTheme.colorScheme.onPrimary
+                                .copy(alpha = 0.8f),
                             style = MaterialTheme.typography.labelLarge
                         )
+
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f)
+                            color = MaterialTheme.colorScheme.onPrimary
+                                .copy(alpha = 0.2f)
                         ) {
                             Text(
                                 text = "1 RC = \$${"%.4f".format(realCoinUsdPrice)} USD",
                                 color = MaterialTheme.colorScheme.onPrimary,
                                 style = MaterialTheme.typography.labelSmall,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(
+                                    horizontal = 8.dp,
+                                    vertical = 4.dp
+                                ),
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -630,7 +920,8 @@ fun HomeScreen(
                     Text(
                         text = "≈ $${"%,.2f".format(realCoinUsd)} USD",
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+                        color = MaterialTheme.colorScheme.onPrimary
+                            .copy(alpha = 0.9f)
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -641,35 +932,56 @@ fun HomeScreen(
                     ) {
                         Button(
                             onClick = onOpenDeposit,
-                            modifier = Modifier.weight(1f).testTag("home_deposit_button"),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("home_deposit_button"),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.onPrimary,
-                                contentColor = MaterialTheme.colorScheme.primary
+                                containerColor =
+                                    MaterialTheme.colorScheme.onPrimary,
+                                contentColor =
+                                    MaterialTheme.colorScheme.primary
                             )
                         ) {
-                            Icon(Icons.Default.ArrowDownward, contentDescription = "Deposit", modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.ArrowDownward,
+                                contentDescription = "Deposit",
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Deposit", fontWeight = FontWeight.Bold)
+                            Text(
+                                "Deposit",
+                                fontWeight = FontWeight.Bold
+                            )
                         }
 
                         Button(
                             onClick = onOpenWithdraw,
-                            modifier = Modifier.weight(1f).testTag("home_withdraw_button"),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("home_withdraw_button"),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.onPrimary,
-                                contentColor = MaterialTheme.colorScheme.primary
+                                containerColor =
+                                    MaterialTheme.colorScheme.onPrimary,
+                                contentColor =
+                                    MaterialTheme.colorScheme.primary
                             )
                         ) {
-                            Icon(Icons.Default.ArrowUpward, contentDescription = "Withdraw", modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.ArrowUpward,
+                                contentDescription = "Withdraw",
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Withdraw", fontWeight = FontWeight.Bold)
+                            Text(
+                                "Withdraw",
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
             }
         }
 
-        // Quick Stats / Requirements
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -677,29 +989,62 @@ fun HomeScreen(
             ) {
                 Card(
                     modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    colors = CardDefaults.cardColors(
+                        containerColor =
+                            MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text("Min Withdrawal", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                        Text("$50.00 USD", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                        Text("~18,518 RC", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    Column(
+                        modifier = Modifier.padding(14.dp)
+                    ) {
+                        Text(
+                            "Min Withdrawal",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                        Text(
+                            "$50.00 USD",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            "~18,518 RC",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
 
                 Card(
                     modifier = Modifier.weight(1f),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    colors = CardDefaults.cardColors(
+                        containerColor =
+                            MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text("Network", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                        Text("BSC BEP-20", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                        Text("BNB Smart Chain", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+                    Column(
+                        modifier = Modifier.padding(14.dp)
+                    ) {
+                        Text(
+                            "Network",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                        Text(
+                            "BSC BEP-20",
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            "BNB Smart Chain",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
                     }
                 }
             }
         }
 
-        // Transactions Header
         item {
             Text(
                 text = "Recent Transactions",
@@ -729,7 +1074,9 @@ fun HomeScreen(
 fun TransactionCard(tx: TransactionRecord) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -738,27 +1085,48 @@ fun TransactionCard(tx: TransactionRecord) {
             Surface(
                 shape = CircleShape,
                 color = when (tx.type) {
-                    TransactionType.DEPOSIT -> Color(0xFFE8F5E9)
-                    TransactionType.WITHDRAWAL -> Color(0xFFFFEBEE)
-                    TransactionType.SPIN_REWARD -> Color(0xFFFFF8E1)
-                    else -> MaterialTheme.colorScheme.surfaceVariant
+                    TransactionType.DEPOSIT ->
+                        Color(0xFFE8F5E9)
+
+                    TransactionType.WITHDRAWAL ->
+                        Color(0xFFFFEBEE)
+
+                    TransactionType.SPIN_REWARD ->
+                        Color(0xFFFFF8E1)
+
+                    else ->
+                        MaterialTheme.colorScheme.surfaceVariant
                 },
                 modifier = Modifier.size(42.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = when (tx.type) {
-                            TransactionType.DEPOSIT -> Icons.Default.ArrowDownward
-                            TransactionType.WITHDRAWAL -> Icons.Default.ArrowUpward
-                            TransactionType.SPIN_REWARD -> Icons.Default.Celebration
-                            else -> Icons.Default.SwapHoriz
+                            TransactionType.DEPOSIT ->
+                                Icons.Default.ArrowDownward
+
+                            TransactionType.WITHDRAWAL ->
+                                Icons.Default.ArrowUpward
+
+                            TransactionType.SPIN_REWARD ->
+                                Icons.Default.Celebration
+
+                            else ->
+                                Icons.Default.SwapHoriz
                         },
                         contentDescription = null,
                         tint = when (tx.type) {
-                            TransactionType.DEPOSIT -> Color(0xFF2E7D32)
-                            TransactionType.WITHDRAWAL -> Color(0xFFC62828)
-                            TransactionType.SPIN_REWARD -> Color(0xFFF57F17)
-                            else -> MaterialTheme.colorScheme.primary
+                            TransactionType.DEPOSIT ->
+                                Color(0xFF2E7D32)
+
+                            TransactionType.WITHDRAWAL ->
+                                Color(0xFFC62828)
+
+                            TransactionType.SPIN_REWARD ->
+                                Color(0xFFF57F17)
+
+                            else ->
+                                MaterialTheme.colorScheme.primary
                         },
                         modifier = Modifier.size(22.dp)
                     )
@@ -767,18 +1135,30 @@ fun TransactionCard(tx: TransactionRecord) {
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
                     text = when (tx.type) {
-                        TransactionType.DEPOSIT -> "Deposit (BEP20)"
-                        TransactionType.WITHDRAWAL -> "Withdrawal (BEP20)"
-                        TransactionType.SPIN_REWARD -> "Spin Reward"
-                        TransactionType.P2P_BUY -> "P2P Buy"
-                        TransactionType.P2P_SELL -> "P2P Sell"
+                        TransactionType.DEPOSIT ->
+                            "Deposit (BEP20)"
+
+                        TransactionType.WITHDRAWAL ->
+                            "Withdrawal (BEP20)"
+
+                        TransactionType.SPIN_REWARD ->
+                            "Spin Reward"
+
+                        TransactionType.P2P_BUY ->
+                            "P2P Buy"
+
+                        TransactionType.P2P_SELL ->
+                            "P2P Sell"
                     },
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.bodyMedium
                 )
+
                 Text(
                     text = "${tx.network} • ${tx.status}",
                     style = MaterialTheme.typography.bodySmall,
@@ -786,12 +1166,27 @@ fun TransactionCard(tx: TransactionRecord) {
                 )
             }
 
-            Column(horizontalAlignment = Alignment.End) {
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
                 Text(
-                    text = "${if (tx.type == TransactionType.DEPOSIT || tx.type == TransactionType.SPIN_REWARD) "+" else "-"}${"%,.2f".format(tx.amountRealCoin)} RC",
+                    text = "${
+                        if (
+                            tx.type == TransactionType.DEPOSIT ||
+                            tx.type == TransactionType.SPIN_REWARD
+                        ) "+" else "-"
+                    }${"%,.2f".format(tx.amountRealCoin)} RC",
                     fontWeight = FontWeight.Bold,
-                    color = if (tx.type == TransactionType.DEPOSIT || tx.type == TransactionType.SPIN_REWARD) Color(0xFF2E7D32) else Color(0xFFC62828)
+                    color = if (
+                        tx.type == TransactionType.DEPOSIT ||
+                        tx.type == TransactionType.SPIN_REWARD
+                    ) {
+                        Color(0xFF2E7D32)
+                    } else {
+                        Color(0xFFC62828)
+                    }
                 )
+
                 Text(
                     text = "≈ $${"%.2f".format(tx.usdValue)} USD",
                     style = MaterialTheme.typography.bodySmall,
@@ -803,7 +1198,7 @@ fun TransactionCard(tx: TransactionRecord) {
 }
 
 // -------------------------------------------------------------
-// P2P TRADING SCREEN (Keeps USDT/ETB as explicitly requested)
+// P2P TRADING SCREEN
 // -------------------------------------------------------------
 @Composable
 fun P2PScreen(
@@ -812,75 +1207,174 @@ fun P2PScreen(
     onDeleteAd: (String) -> Unit = {},
     onTradeAction: (P2POrder) -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Buy, 1: Sell
+    var selectedTab by remember { mutableIntStateOf(0) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("P2P Trading Hub", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Trade RealCoin with local fiat currency (USDT / ETB)", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Text(
+            "P2P Trading Hub",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            "Trade RealCoin with local fiat currency (USDT / ETB)",
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodySmall
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // The user's own active advertisements are visible separately and can be deleted.
         if (myActiveAds.isNotEmpty()) {
-            Text("My Active Ads", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "My Active Ads",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
             Spacer(modifier = Modifier.height(6.dp))
+
             myActiveAds.forEach { ad ->
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("${ad.type} • ${"%,.0f".format(ad.cryptoAmount)} RC", fontWeight = FontWeight.Bold)
-                            Text("${"%,.2f".format(ad.fiatPrice)} ${ad.fiatCurrency} • ${ad.paymentMethod}",
-                                style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                            Text("Active", style = MaterialTheme.typography.labelSmall, color = Color(0xFF2E7D32))
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                "${ad.type} • ${"%,.0f".format(ad.cryptoAmount)} RC",
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Text(
+                                "${"%,.2f".format(ad.fiatPrice)} ${ad.fiatCurrency} • ${ad.paymentMethod}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+
+                            Text(
+                                "Active",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF2E7D32)
+                            )
                         }
-                        TextButton(onClick = { onDeleteAd(ad.id) }) {
+
+                        TextButton(
+                            onClick = {
+                                onDeleteAd(ad.id)
+                            }
+                        ) {
                             Text("Delete")
                         }
                     }
                 }
+
                 Spacer(modifier = Modifier.height(6.dp))
             }
+
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        TabRow(selectedTabIndex = selectedTab) {
-            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
-                Text("BUY", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
+        TabRow(
+            selectedTabIndex = selectedTab
+        ) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 }
+            ) {
+                Text(
+                    "BUY",
+                    modifier = Modifier.padding(12.dp),
+                    fontWeight = FontWeight.Bold
+                )
             }
-            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
-                Text("SELL", modifier = Modifier.padding(12.dp), fontWeight = FontWeight.Bold)
+
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 }
+            ) {
+                Text(
+                    "SELL",
+                    modifier = Modifier.padding(12.dp),
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(p2pOrders.filter { it.type == (if (selectedTab == 0) "SELL" else "BUY") }) { order ->
-                Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            items(
+                p2pOrders.filter {
+                    it.type == if (selectedTab == 0)
+                        "SELL"
+                    else
+                        "BUY"
+                }
+            ) { order ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor =
+                            MaterialTheme.colorScheme.surface
+                    )
+                ) {
                     Row(
                         modifier = Modifier.padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(order.traderName, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Price: ${"%,.2f".format(order.fiatPrice)} ${order.fiatCurrency}",
-                                color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                            Text("Amount: ${"%,.0f".format(order.cryptoAmount)} RC", style = MaterialTheme.typography.bodySmall)
-                            Text("Payment: ${order.paymentMethod}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                        }
-                        Button(
-                            onClick = { onTradeAction(order) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (selectedTab == 0) Color(0xFF2E7D32) else Color(0xFFC62828)
-                            )
+                        Column(
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Text(if (selectedTab == 0) "Buy RC" else "Sell RC")
+                            Text(
+                                order.traderName,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                "Price: ${"%,.2f".format(order.fiatPrice)} ${order.fiatCurrency}",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+
+                            Text(
+                                "Amount: ${"%,.0f".format(order.cryptoAmount)} RC",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+
+                            Text(
+                                "Payment: ${order.paymentMethod}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                onTradeAction(order)
+                            }
+                        ) {
+                            Text(
+                                if (selectedTab == 0)
+                                    "Buy RC"
+                                else
+                                    "Sell RC"
+                            )
                         }
                     }
                 }
@@ -907,12 +1401,23 @@ fun SpinWheelScreen(
     )
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("Daily Lucky Wheel", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Spin to win free RealCoin daily rewards!", color = Color.Gray, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "Daily Lucky Wheel",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+
+        Text(
+            "Spin to win free RealCoin daily rewards!",
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodyMedium
+        )
 
         Spacer(modifier = Modifier.height(30.dp))
 
@@ -921,14 +1426,36 @@ fun SpinWheelScreen(
                 .size(240.dp)
                 .rotate(animatedRotation)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .border(6.dp, MaterialTheme.colorScheme.primary, CircleShape),
+                .background(
+                    MaterialTheme.colorScheme.primaryContainer
+                )
+                .border(
+                    6.dp,
+                    MaterialTheme.colorScheme.primary,
+                    CircleShape
+                ),
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Celebration, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(50.dp))
-                Text("RealCoin", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Text("Prize Pool", style = MaterialTheme.typography.bodySmall)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    Icons.Default.Celebration,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(50.dp)
+                )
+
+                Text(
+                    "RealCoin",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Text(
+                    "Prize Pool",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
 
@@ -940,99 +1467,220 @@ fun SpinWheelScreen(
                     isSpinning = true
                     val randomAdd = 360f * 4 + 180
                     rotationAngle += randomAdd
-                    val reward = 0.0 // Reward is determined and validated by trusted reward logic
-                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    val reward = 0.0
+
+                    android.os.Handler(
+                        android.os.Looper.getMainLooper()
+                    ).postDelayed({
                         isSpinning = false
                         onSpinWin(reward)
-                        Toast.makeText(context, "Congratulations! You won ${"%,.0f".format(reward)} RealCoin!", Toast.LENGTH_LONG).show()
+
+                        Toast.makeText(
+                            context,
+                            "Congratulations! You won ${"%,.0f".format(reward)} RealCoin!",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }, 2600)
                 }
             },
             enabled = !isSpinning,
-            modifier = Modifier.fillMaxWidth(0.7f).height(50.dp).testTag("spin_wheel_button")
+            modifier = Modifier
+                .fillMaxWidth(0.7f)
+                .height(50.dp)
+                .testTag("spin_wheel_button")
         ) {
-            Text(if (isSpinning) "Spinning..." else "Spin Wheel")
+            Text(
+                if (isSpinning)
+                    "Spinning..."
+                else
+                    "Spin Wheel"
+            )
         }
     }
 }
 
-
+// -------------------------------------------------------------
+// ACTIVE P2P ORDER
+// -------------------------------------------------------------
 @Composable
 fun ActiveP2POrderScreen(
     order: P2POrderEntity,
     onExpire: () -> Unit,
     onClose: () -> Unit
 ) {
-    var remainingMs by remember(order.id) { mutableLongStateOf((order.expiresAt - System.currentTimeMillis()).coerceAtLeast(0L)) }
+    var remainingMs by remember(order.id) {
+        mutableLongStateOf(
+            (
+                order.expiresAt -
+                    System.currentTimeMillis()
+            ).coerceAtLeast(0L)
+        )
+    }
+
     LaunchedEffect(order.id) {
         while (remainingMs > 0L) {
             kotlinx.coroutines.delay(1000L)
-            remainingMs = (order.expiresAt - System.currentTimeMillis()).coerceAtLeast(0L)
+
+            remainingMs = (
+                order.expiresAt -
+                    System.currentTimeMillis()
+                ).coerceAtLeast(0L)
         }
-        if (order.status == "ESCROW_LOCKED") onExpire()
+
+        if (order.status == "ESCROW_LOCKED") {
+            onExpire()
+        }
     }
+
     val minutes = remainingMs / 60000L
     val seconds = (remainingMs / 1000L) % 60L
+
     AlertDialog(
         onDismissRequest = {},
-        title = { Text("Active P2P Order") },
+        title = {
+            Text("Active P2P Order")
+        },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 Text("Buyer: ${order.buyerName}")
                 Text("Seller: ${order.sellerName}")
                 Text("Bank: ${order.paymentMethod}")
                 Text("Account name: ${order.paymentName}")
                 Text("Account number: ${order.accountNumber}")
-                Text("REAL amount: ${"%,.2f".format(order.cryptoAmount)} RC")
-                Text("ETB amount: ${"%,.2f".format(order.fiatPrice)} ETB")
-                Text("Payment deadline: %02d:%02d".format(minutes, seconds), fontWeight = FontWeight.Bold)
-                Text("Pay the seller and confirm payment before the timer ends.")
+                Text(
+                    "REAL amount: ${"%,.2f".format(order.cryptoAmount)} RC"
+                )
+                Text(
+                    "ETB amount: ${"%,.2f".format(order.fiatPrice)} ETB"
+                )
+                Text(
+                    "Payment deadline: %02d:%02d".format(
+                        minutes,
+                        seconds
+                    ),
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Pay the seller and confirm payment before the timer ends."
+                )
             }
         },
-        confirmButton = { TextButton(onClick = onClose) { Text("Close") } }
+        confirmButton = {
+            TextButton(
+                onClick = onClose
+            ) {
+                Text("Close")
+            }
+        }
     )
 }
 
+// -------------------------------------------------------------
+// HELP CENTER
+// -------------------------------------------------------------
 @Composable
-fun HelpCenterScreen(onBack: () -> Unit) {
+fun HelpCenterScreen(
+    onBack: () -> Unit
+) {
     var message by remember { mutableStateOf("") }
     var submitted by remember { mutableStateOf(false) }
+
     Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
-            Text("Help Center", style = MaterialTheme.typography.headlineMedium)
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBack
+            ) {
+                Icon(
+                    Icons.Default.ArrowBack,
+                    contentDescription = "Back"
+                )
+            }
+
+            Text(
+                "Help Center",
+                style = MaterialTheme.typography.headlineMedium
+            )
         }
-        Text("Choose a topic or send a message to support.", color = Color.Gray)
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Common help", style = MaterialTheme.typography.titleMedium)
-                Text("• Deposit and withdrawal requests are reviewed by authorized admins.")
-                Text("• KYC approval or rejection is handled by authorized admins.")
-                Text("• P2P disputes remain locked until review.")
-                Text("• Never share your password or private keys.")
+
+        Text(
+            "Choose a topic or send a message to support.",
+            color = Color.Gray
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Common help",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                Text(
+                    "• Deposit and withdrawal requests are reviewed by authorized admins."
+                )
+
+                Text(
+                    "• KYC approval or rejection is handled by authorized admins."
+                )
+
+                Text(
+                    "• P2P disputes remain locked until review."
+                )
+
+                Text(
+                    "• Never share your password or private keys."
+                )
             }
         }
+
         OutlinedTextField(
             value = message,
-            onValueChange = { message = it; submitted = false },
+            onValueChange = {
+                message = it
+                submitted = false
+            },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Describe your problem") },
+            label = {
+                Text("Describe your problem")
+            },
             minLines = 4
         )
+
         Button(
-            onClick = { submitted = true },
+            onClick = {
+                submitted = true
+            },
             enabled = message.trim().isNotEmpty(),
             modifier = Modifier.fillMaxWidth()
-        ) { Text("Submit Help Request") }
+        ) {
+            Text("Submit Help Request")
+        }
+
         if (submitted) {
-            Text("Your message is prepared. Connect this screen to the support backend before production use.", color = Color(0xFFF57F17))
+            Text(
+                "Your message is prepared. Connect this screen to the support backend before production use.",
+                color = Color(0xFFF57F17)
+            )
         }
     }
 }
 
+// -------------------------------------------------------------
+// ADMIN CONTROL PANEL
+// -------------------------------------------------------------
 @Composable
 fun AdminControlScreen(
     onBack: () -> Unit,
@@ -1041,68 +1689,177 @@ fun AdminControlScreen(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    var usdPrice by remember { mutableStateOf("0.0027") }
-    var usdToEtb by remember { mutableStateOf("187") }
-    var saving by remember { mutableStateOf(false) }
+
+    var usdPrice by remember {
+        mutableStateOf("0.0027")
+    }
+
+    var usdToEtb by remember {
+        mutableStateOf("187")
+    }
+
+    var saving by remember {
+        mutableStateOf(false)
+    }
 
     LaunchedEffect(Unit) {
-        usdPrice = repository.getRealCoinUsdPrice().toString()
-        usdToEtb = repository.getUsdToEtbRate().toString()
+        usdPrice =
+            repository.getRealCoinUsdPrice().toString()
+
+        usdToEtb =
+            repository.getUsdToEtbRate().toString()
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
-            Text("Admin Control Panel", style = MaterialTheme.typography.headlineMedium)
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onBack
+            ) {
+                Icon(
+                    Icons.Default.ArrowBack,
+                    contentDescription = "Back"
+                )
+            }
+
+            Text(
+                "Admin Control Panel",
+                style = MaterialTheme.typography.headlineMedium
+            )
         }
-        Text("Authorized admin area", color = Color.Gray)
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("REAL price controls", style = MaterialTheme.typography.titleMedium)
-                Text("Changing price updates USD/ETB valuation only. It never increases REAL coin units.", color = Color.Gray)
+
+        Text(
+            "Authorized admin area",
+            color = Color.Gray
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "REAL price controls",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
+                Text(
+                    "Changing price updates USD/ETB valuation only. It never increases REAL coin units.",
+                    color = Color.Gray
+                )
+
                 OutlinedTextField(
                     value = usdPrice,
-                    onValueChange = { usdPrice = it },
-                    label = { Text("1 REAL in USD") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    onValueChange = {
+                        usdPrice = it
+                    },
+                    label = {
+                        Text("1 REAL in USD")
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal
+                    ),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
                 OutlinedTextField(
                     value = usdToEtb,
-                    onValueChange = { usdToEtb = it },
-                    label = { Text("1 USD in ETB") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    onValueChange = {
+                        usdToEtb = it
+                    },
+                    label = {
+                        Text("1 USD in ETB")
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal
+                    ),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
                 Button(
                     enabled = !saving,
                     onClick = {
-                        val price = usdPrice.toDoubleOrNull()
-                        val rate = usdToEtb.toDoubleOrNull()
-                        if (price == null || rate == null || price <= 0.0 || rate <= 0.0) {
-                            Toast.makeText(context, "Enter valid positive values", Toast.LENGTH_LONG).show()
+                        val price =
+                            usdPrice.toDoubleOrNull()
+
+                        val rate =
+                            usdToEtb.toDoubleOrNull()
+
+                        if (
+                            price == null ||
+                            rate == null ||
+                            price <= 0.0 ||
+                            rate <= 0.0
+                        ) {
+                            Toast.makeText(
+                                context,
+                                "Enter valid positive values",
+                                Toast.LENGTH_LONG
+                            ).show()
                         } else {
                             saving = true
+
                             scope.launch {
-                                repository.updatePricing(adminUserId, price, rate)
-                                    .onSuccess { Toast.makeText(context, "Pricing updated", Toast.LENGTH_SHORT).show() }
-                                    .onFailure { Toast.makeText(context, it.message ?: "Update failed", Toast.LENGTH_LONG).show() }
+                                repository
+                                    .updatePricing(
+                                        adminUserId,
+                                        price,
+                                        rate
+                                    )
+                                    .onSuccess {
+                                        Toast.makeText(
+                                            context,
+                                            "Pricing updated",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                    .onFailure {
+                                        Toast.makeText(
+                                            context,
+                                            it.message
+                                                ?: "Update failed",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+
                                 saving = false
                             }
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
-                ) { Text(if (saving) "Saving..." else "Save pricing") }
+                ) {
+                    Text(
+                        if (saving)
+                            "Saving..."
+                        else
+                            "Save pricing"
+                    )
+                }
             }
         }
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Admin review areas", style = MaterialTheme.typography.titleMedium)
+
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "Admin review areas",
+                    style = MaterialTheme.typography.titleMedium
+                )
+
                 Text("• Deposit requests")
                 Text("• Withdrawal requests")
                 Text("• KYC approve / reject")
