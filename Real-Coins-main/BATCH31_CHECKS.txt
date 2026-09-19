@@ -1,0 +1,5 @@
+Batch 31 checks
+node --check src/index.js: PASS
+npm test: PASS (3/3)
+npm run check: PASS
+Attachment access control: PASS

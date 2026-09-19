@@ -1,0 +1,14 @@
+Batch 18 financial request authority / audit protection
+
+1. Added server-authoritative wallet deposit/withdrawal request table.
+2. Added per-account idempotency protection for financial requests.
+3. Added admin-only request listing and approval/rejection endpoints.
+4. Wallet balances are changed only when an ADMIN approves a request.
+5. Withdrawal approval checks available REAL after excluding locked REAL.
+6. Deposit/withdrawal wallet mutation is tied to the approval transaction by SQLite triggers.
+7. Every approved financial request creates an immutable ledger record linked to the request.
+8. Client-side wallet balance mutation remains prohibited.
+9. Backend src/index.js syntax check: PASS.
+10. Backend npm test: 3/3 PASS.
+11. Backend npm run check: PASS.
+12. Cloudflare/D1 migration deployment was not performed locally.

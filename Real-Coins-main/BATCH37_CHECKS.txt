@@ -1,0 +1,7 @@
+Batch 37 checks
+- Backend syntax: PASS
+- Backend tests: PASS
+- Backend static checks: PASS
+- P2P payment proof now must be a private backend attachment owned by the authenticated buyer.
+- P2P chat attachments now must be private backend attachments owned by the authenticated sender.
+- External/arbitrary HTTPS attachment URLs are rejected.

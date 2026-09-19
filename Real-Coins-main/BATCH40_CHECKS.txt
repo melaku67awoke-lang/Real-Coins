@@ -1,0 +1,5 @@
+Batch 40 checks
+- Added migration 0019_p2p_numeric_integrity.sql
+- Database rejects invalid P2P ad numeric state
+- Database rejects invalid P2P order numeric/timing state
+- Existing valid partial-order updates remain allowed
