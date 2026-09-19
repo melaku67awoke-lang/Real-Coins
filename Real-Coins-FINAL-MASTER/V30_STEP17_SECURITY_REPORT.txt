@@ -1,0 +1,13 @@
+RealCoin v30 - Step 17 Security Hardening
+
+Changes:
+- Reset authorization tokens are now cryptographically verified with the Ed25519 public key derived from the server-side private key.
+- Token header/type/version, issuer, audience, subject, session ID, JTI, issued-at and expiry are validated.
+- OTP verification is one-time: a reset session that has already been verified cannot issue another reset authorization.
+- Verification state is written transactionally in Firestore to prevent concurrent OTP verification from creating multiple valid authorizations.
+- Existing OTP attempt limits, expiry, hashing and rate limiting remain in place.
+
+Verification performed:
+- Node syntax checks passed for backend security, store and server modules.
+- Backend test suite: 5 passed, 0 failed.
+- No Android Gradle build was claimed because the project environment does not provide an executable Gradle setup.

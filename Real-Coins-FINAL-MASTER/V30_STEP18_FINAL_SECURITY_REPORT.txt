@@ -1,0 +1,24 @@
+RealCoin v30 - Step 18 Final Security/Integration Report
+
+Source: Real-Coins-step17.zip
+
+Step 18 finding and fix:
+The password-reset flow previously consumed the server authorization token, then used the email originally typed into the Android UI to choose which local account password to change. That allowed the final account-selection value to come from client-controlled input rather than the OTP-verified authorization.
+
+Fix:
+- The backend consume endpoint now returns the email (token subject) bound to the verified reset authorization.
+- Android PasswordResetService returns that authorized email.
+- RealCoinViewModel uses the backend-authorized email for the final local password update and no longer uses the user-entered email for account selection.
+- The existing PBKDF2 password hashing and UserDao update remain unchanged.
+
+Verification performed:
+- node --check backend/src/server.js: PASS
+- node --check backend/src/security.js: PASS
+- npm --prefix backend test: 5 passed, 0 failed
+- ZIP archive integrity: verified after packaging
+
+Android Gradle build:
+Not claimed. The repository does not contain an executable gradlew script, so a real Android Gradle compilation could not be run in this environment.
+
+Deployment:
+Not claimed. Cloud Run/Firestore/Gmail deployment still requires the user's Google Cloud project configuration and server-side secrets.

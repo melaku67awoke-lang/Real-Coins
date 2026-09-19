@@ -1,0 +1,4 @@
+Batch 33 checks
+- P2P cancellation trigger now enforces the expiry timestamp at the database layer.
+- Early ESCROW_LOCKED -> CANCELLED transitions abort with p2p_order_not_expired.
+- Existing BUY unlock and ad restoration triggers remain atomic.

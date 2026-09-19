@@ -1,0 +1,16 @@
+Batch 53 — Spin Wheel / 24-hour reward timer
+
+Implemented:
+- One free spin every 24 hours.
+- After the free spin is used, additional spins cost exactly 10 RC.
+- Paid spins deduct only from available REAL balance (locked REAL cannot be spent).
+- Spin outcomes above 10 RC have a configured probability of exactly 20% (20 RC = 15%, 50 RC = 5%).
+- Free-spin timestamp is persisted in Room with migration 12 -> 13.
+- The 24-hour countdown updates every second and survives app restarts because the timestamp is persisted.
+- The daily reward/free-spin uses the same 24-hour timer.
+- Daily reward activity requirements remain enforced for the free spin.
+- Spin payouts and paid-spin charges are written to the local immutable transaction ledger.
+- Fixed the previous callback so a completed wheel spin is not accidentally processed a second time.
+
+Build note:
+- Full Android Gradle build was not run because the project does not contain the Gradle wrapper JAR/script in this ZIP.
