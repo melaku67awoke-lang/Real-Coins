@@ -1,6 +1,0 @@
-Batch 50 verification
-- Strengthened admin bootstrap secret comparison using SHA-256 digest comparison instead of direct string equality.
-- Added regression tests for matching and mismatching bootstrap secrets.
-- node --check src/index.js: PASS
-- npm test: 8/8 PASS
-- npm run check: PASS

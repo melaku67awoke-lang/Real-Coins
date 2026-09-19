@@ -1,1 +1,0 @@
-Batch 48: fixed P2P completion result-index validation; the six-statement atomic batch is now checked against indices 0-5, preventing every valid completion from being falsely rejected.

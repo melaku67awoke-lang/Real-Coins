@@ -1,5 +1,0 @@
-Batch 36 - financial request separation of duties
-Self-approval blocked at API and D1 trigger.
-node --check: PASS
-npm test: PASS
-npm run check: PASS
