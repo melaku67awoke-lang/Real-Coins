@@ -3,9 +3,6 @@ package com.example.data.db
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
-
-
-
 @Dao
 interface PasswordResetSessionDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
@@ -25,12 +22,16 @@ interface PasswordResetSessionDao {
 interface PaymentAccountDao {
     @Query("SELECT * FROM payment_accounts WHERE userId = :userId ORDER BY createdAt DESC")
     fun getForUser(userId: String): Flow<List<PaymentAccountEntity>>
+
     @Query("SELECT * FROM payment_accounts WHERE id = :id AND userId = :userId LIMIT 1")
     suspend fun getOwned(id: String, userId: String): PaymentAccountEntity?
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(account: PaymentAccountEntity)
+
     @Query("SELECT COUNT(*) FROM payment_accounts WHERE userId = :userId")
     suspend fun countForUser(userId: String): Int
+
     @Query("DELETE FROM payment_accounts WHERE id = :id AND userId = :userId")
     suspend fun deleteOwned(id: String, userId: String): Int
 }
@@ -50,7 +51,14 @@ interface UserDao {
     suspend fun insertUser(user: UserEntity)
 
     @Query("UPDATE users SET passwordHash = :passwordHash, passwordSalt = :passwordSalt WHERE id = :userId")
-    suspend fun updatePassword(userId: String, passwordHash: String, passwordSalt: String): Int
+    suspend fun updatePassword(
+        userId: String,
+        passwordHash: String,
+        passwordSalt: String
+    ): Int
+
+    @Query("UPDATE users SET role = :role WHERE id = :userId")
+    suspend fun updateRole(userId: String, role: String): Int
 
     @Query("SELECT COUNT(*) FROM users WHERE role = 'USER'")
     suspend fun countUsers(): Int
@@ -233,12 +241,14 @@ interface RewardDao {
     suspend fun insertRewardClaim(claim: RewardClaimEntity)
 
     @Query("SELECT * FROM reward_claims WHERE userId = :userId AND periodKey = :periodKey LIMIT 1")
-    suspend fun getClaimForPeriod(userId: String, periodKey: String): RewardClaimEntity?
+    suspend fun getClaimForPeriod(
+        userId: String,
+        periodKey: String
+    ): RewardClaimEntity?
 
     @Query("SELECT * FROM reward_claims WHERE userId = :userId ORDER BY claimTimestamp DESC")
     suspend fun getClaimsForUser(userId: String): List<RewardClaimEntity>
 }
-
 
 @Dao
 interface AppSettingsDao {
@@ -251,7 +261,6 @@ interface AppSettingsDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(setting: AppSettingEntity)
 }
-
 
 @Dao
 interface HelpRequestDao {
@@ -271,7 +280,6 @@ interface HelpRequestDao {
     suspend fun update(request: HelpRequestEntity)
 }
 
-
 @Dao
 interface P2PChatDao {
     @Query("SELECT * FROM p2p_chat_messages WHERE orderId = :orderId ORDER BY createdAt ASC")
@@ -282,4 +290,5 @@ interface P2PChatDao {
 
     @Query("DELETE FROM p2p_chat_messages WHERE orderId = :orderId")
     suspend fun deleteForOrder(orderId: String)
+
 }
