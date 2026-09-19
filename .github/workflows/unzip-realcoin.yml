@@ -1,3 +1,19 @@
+name: unzip
+
+on:
+  workflow_dispatch:
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Unzip final master
         run: |
           set -e
@@ -14,14 +30,18 @@
 
           unzip -q -o "$ZIP_FILE" -d /tmp/realcoins
 
-          # If the ZIP contains one outer project folder,
-          # use its contents as the repository root.
+          # Detect whether the ZIP contains an outer
+          # Real-Coins-FINAL-MASTER folder.
           if [ -d "/tmp/realcoins/Real-Coins-FINAL-MASTER" ]; then
             PROJECT_DIR="/tmp/realcoins/Real-Coins-FINAL-MASTER"
           else
             PROJECT_DIR="/tmp/realcoins"
           fi
 
+          echo "Project source: $PROJECT_DIR"
+
+          # Copy the project contents directly into the
+          # repository root.
           rsync -a --delete \
             --exclude='.git/' \
             --exclude='.github/workflows/' \
@@ -29,3 +49,29 @@
             "$PROJECT_DIR"/ ./
 
           rm -f "$ZIP_FILE"
+
+      - name: Show project structure
+        run: |
+          echo "Repository root:"
+          ls -la
+
+          echo ""
+          echo "Checking important project folders:"
+
+          test -d "app" && echo "OK: app/"
+          test -d "backend" && echo "OK: backend/"
+          test -d "gradle" && echo "OK: gradle/"
+
+      - name: Commit unzipped project
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Unzip Real-Coins final master"
+            git push
+          fi
