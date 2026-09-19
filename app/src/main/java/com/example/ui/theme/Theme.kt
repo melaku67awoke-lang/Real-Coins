@@ -6,37 +6,86 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+// Real-Coins brand palette: black + gold.
+private val Gold = Color(0xFFFFC107)
+private val GoldLight = Color(0xFFFFD54F)
+private val GoldDark = Color(0xFFD89E00)
+private val Black = Color(0xFF080808)
+private val Surface = Color(0xFF141414)
+private val SurfaceVariant = Color(0xFF211B08)
+private val TextPrimary = Color(0xFFF7F7F7)
+private val TextSecondary = Color(0xFFB9B9B9)
+private val Outline = Color(0xFF5A4A18)
+
 private val DarkColorScheme = darkColorScheme(
-    primary = Color(0xFF00B8D4),
-    onPrimary = Color.White,
-    secondary = Color(0xFF80DEEA),
-    onSecondary = Color(0xFF06242A),
-    tertiary = Color(0xFFFFFFFF),
-    background = Color(0xFF071014),
-    onBackground = Color(0xFFF5F7F8),
-    surface = Color(0xFF0D171C),
-    onSurface = Color(0xFFF5F7F8),
-    surfaceVariant = Color(0xFF142329),
-    onSurfaceVariant = Color(0xFFB8C5C9),
-    outline = Color(0xFF3B4D53)
+    primary = Gold,
+    onPrimary = Black,
+
+    primaryContainer = Color(0xFF3A2D05),
+    onPrimaryContainer = GoldLight,
+
+    secondary = GoldLight,
+    onSecondary = Black,
+
+    secondaryContainer = Color(0xFF302604),
+    onSecondaryContainer = GoldLight,
+
+    tertiary = GoldDark,
+    onTertiary = Black,
+
+    background = Black,
+    onBackground = TextPrimary,
+
+    surface = Surface,
+    onSurface = TextPrimary,
+
+    surfaceVariant = SurfaceVariant,
+    onSurfaceVariant = TextSecondary,
+
+    outline = Outline
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF008FA3),
-    onPrimary = Color.White,
-    secondary = Color(0xFF00ACC1),
-    onSecondary = Color.White,
-    tertiary = Color(0xFF263238),
-    background = Color(0xFFF7FAFB),
-    onBackground = Color(0xFF10181C),
+    primary = GoldDark,
+    onPrimary = Black,
+
+    primaryContainer = Color(0xFFFFE8A3),
+    onPrimaryContainer = Color(0xFF2A2100),
+
+    secondary = GoldDark,
+    onSecondary = Black,
+
+    secondaryContainer = Color(0xFFFFEDB8),
+    onSecondaryContainer = Color(0xFF2A2100),
+
+    tertiary = GoldDark,
+    onTertiary = Black,
+
+    background = Color(0xFFFAFAF8),
+    onBackground = Color(0xFF171717),
+
     surface = Color.White,
-    onSurface = Color(0xFF10181C),
-    surfaceVariant = Color(0xFFE8F0F2),
-    onSurfaceVariant = Color(0xFF4B5B60),
-    outline = Color(0xFF9AAEB4)
+    onSurface = Color(0xFF171717),
+
+    surfaceVariant = Color(0xFFF1E9CC),
+    onSurfaceVariant = Color(0xFF5A523D),
+
+    outline = Color(0xFF9A8A52)
 )
 
 @Composable
-fun MyApplicationTheme(darkTheme: Boolean = true, dynamicColor: Boolean = false, content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme, typography = Typography, content = content)
+fun MyApplicationTheme(
+    darkTheme: Boolean = true,
+    dynamicColor: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    MaterialTheme(
+        colorScheme = if (darkTheme) {
+            DarkColorScheme
+        } else {
+            LightColorScheme
+        },
+        typography = Typography,
+        content = content
+    )
 }
