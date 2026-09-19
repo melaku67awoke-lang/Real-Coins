@@ -1,8 +1,0 @@
-Batch 14 security hardening
-
-1. P2P financial/action methods no longer fall back to local Room mutations when backend authentication is unavailable.
-2. P2P create/delete/start/chat/payment/expiry/release actions require an authenticated backend session.
-3. Local Room remains available as a cache/read source; financial mutations are not performed locally as a fallback.
-4. Existing Batch 13 P2P escrow/capacity behavior is preserved.
-5. Existing backend security tests from Batch 13 remain unchanged.
-6. Full Android Gradle build was not run locally because the project still has no gradlew/wrapper JAR and no system Gradle; GitHub Actions remains the build verification path.
