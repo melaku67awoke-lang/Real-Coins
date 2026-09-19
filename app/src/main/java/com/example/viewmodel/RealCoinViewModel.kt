@@ -14,7 +14,6 @@ import com.example.model.P2POrder
 import com.example.model.TransactionRecord
 import com.example.model.TransactionType
 import com.example.model.UserProfile
-import com.example.ui.screens.REAL_COIN_USD_VALUE
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -264,6 +263,18 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    /**
+     * LOGIN SECURITY:
+     *
+     * Normal users can log in ONLY when their KYC status is VERIFIED.
+     *
+     * Pending, rejected, and not-submitted users are rejected here
+     * BEFORE a backend session is created and BEFORE _currentUser is set.
+     *
+     * This means Login never redirects an unverified user to KYC.
+     *
+     * Admin users are allowed to log in without KYC verification.
+     */
     fun login(
         usernameOrEmail: String,
         pass: String,
@@ -271,14 +282,68 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
         onError: (String) -> Unit
     ) {
         viewModelScope.launch {
+
+            // First verify that the local account exists and that
+            // the password is correct.
             val result = repository.login(
                 usernameOrEmail,
                 pass
             )
 
             result.onSuccess { user ->
+
+                /*
+                 * IMPORTANT:
+                 *
+                 * Check KYC BEFORE connectBackendSession().
+                 *
+                 * This prevents a PENDING/REJECTED/NOT_SUBMITTED
+                 * normal user from becoming a logged-in session.
+                 */
+                if (user.role != "ADMIN") {
+
+                    val kyc =
+                        repository.getKycForUserSync(user.id)
+
+                    val kycStatus =
+                        kyc?.status
+                            ?.trim()
+                            ?.uppercase()
+                            ?: "NOT_SUBMITTED"
+
+                    if (kycStatus != "VERIFIED") {
+
+                        val message = when (kycStatus) {
+                            "PENDING" ->
+                                "Login blocked. Your KYC is still pending admin verification."
+
+                            "REJECTED" ->
+                                "Login blocked. Your KYC was rejected. Please submit your KYC again."
+
+                            "NOT_SUBMITTED" ->
+                                "Login blocked. Please complete KYC verification before logging in."
+
+                            else ->
+                                "Login blocked. Your KYC must be VERIFIED before you can log in."
+                        }
+
+                        onError(message)
+
+                        // VERY IMPORTANT:
+                        // Do not connect backend session.
+                        // Do not set _currentUser.
+                        // Do not redirect to KYC.
+                        return@launch
+                    }
+                }
+
+                /*
+                 * Only VERIFIED normal users and ADMIN users
+                 * reach this point.
+                 */
                 repository.connectBackendSession(user, pass)
                     .onSuccess {
+
                         _currentUser.value = user
 
                         viewModelScope.launch {
@@ -290,6 +355,9 @@ class RealCoinViewModel(application: Application) : AndroidViewModel(application
                                 }
                         }
 
+                        // Login succeeded.
+                        // MainActivity should send this user directly
+                        // to the Main App because KYC is already verified.
                         onSuccess(user)
                     }
                     .onFailure { err ->
