@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.db.P2POrderEntity
+import com.example.data.repository.syncKycFromBackend
 import com.example.model.TransactionType
 import com.example.ui.screens.*
 import com.example.ui.theme.MyApplicationTheme
@@ -80,7 +81,10 @@ fun RealCoinApp(viewModel: RealCoinViewModel = viewModel()) {
         .collectAsState(initial = USD_TO_ETB)
 
     val preferences = remember {
-        context.getSharedPreferences(APP_STATE_PREFS, android.content.Context.MODE_PRIVATE)
+        context.getSharedPreferences(
+            APP_STATE_PREFS,
+            android.content.Context.MODE_PRIVATE
+        )
     }
 
     /*
@@ -303,8 +307,12 @@ fun RealCoinApp(viewModel: RealCoinViewModel = viewModel()) {
     when (currentDestination) {
         AppDestination.LANDING -> {
             LandingScreen(
-                onNavigateToLogin = { currentDestination = AppDestination.LOGIN },
-                onNavigateToRegister = { currentDestination = AppDestination.REGISTER }
+                onNavigateToLogin = {
+                    currentDestination = AppDestination.LOGIN
+                },
+                onNavigateToRegister = {
+                    currentDestination = AppDestination.REGISTER
+                }
             )
         }
 
@@ -328,22 +336,34 @@ fun RealCoinApp(viewModel: RealCoinViewModel = viewModel()) {
                         onError = { errorMsg ->
                             loginKycCheckInProgress = false
                             currentDestination = AppDestination.LOGIN
-                            Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                            Toast.makeText(
+                                context,
+                                errorMsg,
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     )
                 },
-                onNavigateToRegister = { currentDestination = AppDestination.REGISTER },
+                onNavigateToRegister = {
+                    currentDestination = AppDestination.REGISTER
+                },
                 onNavigateToForgotPassword = {
                     currentDestination = AppDestination.FORGOT_PASSWORD
                 },
-                onBack = { currentDestination = AppDestination.LANDING }
+                onBack = {
+                    currentDestination = AppDestination.LANDING
+                }
             )
         }
 
         AppDestination.FORGOT_PASSWORD -> {
             ForgotPasswordEntryScreen(
                 onRequestRecovery = { email, onSuccess, onError ->
-                    viewModel.requestRecovery(email, onSuccess, onError)
+                    viewModel.requestRecovery(
+                        email,
+                        onSuccess,
+                        onError
+                    )
                 },
                 onCheckRecoveryStatus = { recoveryRequestId, onSuccess, onError ->
                     viewModel.checkRecoveryStatus(
@@ -366,13 +386,19 @@ fun RealCoinApp(viewModel: RealCoinViewModel = viewModel()) {
                         onError
                     )
                 },
-                onBack = { currentDestination = AppDestination.LOGIN }
+                onBack = {
+                    currentDestination = AppDestination.LOGIN
+                }
             )
         }
 
         AppDestination.REGISTER -> {
             RegisterScreen(
-                onRegisterSuccess = { username, email, password, referralCode ->
+                onRegisterSuccess = {
+                    username,
+                    email,
+                    password,
+                    referralCode ->
                     viewModel.register(
                         username = username,
                         email = email,
@@ -387,11 +413,17 @@ fun RealCoinApp(viewModel: RealCoinViewModel = viewModel()) {
                             ).show()
                         },
                         onError = { errorMsg ->
-                            Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                            Toast.makeText(
+                                context,
+                                errorMsg,
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     )
                 },
-                onBack = { currentDestination = AppDestination.LANDING }
+                onBack = {
+                    currentDestination = AppDestination.LANDING
+                }
             )
         }
 
@@ -413,34 +445,44 @@ fun RealCoinApp(viewModel: RealCoinViewModel = viewModel()) {
             ) {
                 KYCScreen(
                     kycStatus = displayedKycStatus,
-                    onKYCSubmitted = { fullName, idType, idNumber, frontIdUri, backIdUri ->
-                    viewModel.submitKyc(
-                        fullName = fullName,
-                        idType = idType,
-                        idNumber = idNumber,
-                        frontIdUri = frontIdUri,
-                        backIdUri = backIdUri,
-                        onSuccess = {
-                            /*
-                             * NEVER navigate to Landing or Home here.
-                             * Stay on KYC and show its PENDING waiting state.
-                             */
-                            preferences.edit()
-                                .putBoolean(KYC_PENDING, true)
-                                .apply()
+                    onKYCSubmitted = {
+                        fullName,
+                        idType,
+                        idNumber,
+                        frontIdUri,
+                        backIdUri ->
 
-                            currentDestination = AppDestination.KYC
+                        viewModel.submitKyc(
+                            fullName = fullName,
+                            idType = idType,
+                            idNumber = idNumber,
+                            frontIdUri = frontIdUri,
+                            backIdUri = backIdUri,
+                            onSuccess = {
+                                /*
+                                 * NEVER navigate to Landing or Home here.
+                                 * Stay on KYC and show its PENDING waiting state.
+                                 */
+                                preferences.edit()
+                                    .putBoolean(KYC_PENDING, true)
+                                    .apply()
 
-                            Toast.makeText(
-                                context,
-                                "KYC submitted. Please wait for admin verification.",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        },
-                        onError = { errorMsg ->
-                            Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
-                        }
-                    )
+                                currentDestination = AppDestination.KYC
+
+                                Toast.makeText(
+                                    context,
+                                    "KYC submitted. Please wait for admin verification.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            onError = { errorMsg ->
+                                Toast.makeText(
+                                    context,
+                                    errorMsg,
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        )
                     }
                 )
 
@@ -452,8 +494,12 @@ fun RealCoinApp(viewModel: RealCoinViewModel = viewModel()) {
                     OutlinedButton(
                         onClick = {
                             viewModel.logout()
-                            preferences.edit().remove(KYC_PENDING).apply()
+                            preferences.edit()
+                                .remove(KYC_PENDING)
+                                .apply()
+
                             currentDestination = AppDestination.LOGIN
+
                             Toast.makeText(
                                 context,
                                 "DEBUG: KYC test switch — please log in as ADMIN.",
@@ -474,7 +520,9 @@ fun RealCoinApp(viewModel: RealCoinViewModel = viewModel()) {
             MainAppContent(
                 currentDestination = currentDestination,
                 onDestinationChange = { destination ->
-                    if (canEnterMainApp) currentDestination = destination
+                    if (canEnterMainApp) {
+                        currentDestination = destination
+                    }
                 },
                 userProfile = userProfile,
                 currentUserRole = currentUser?.role,
@@ -487,11 +535,19 @@ fun RealCoinApp(viewModel: RealCoinViewModel = viewModel()) {
                 usdToEtbRate = usdToEtbRate,
                 viewModel = viewModel,
                 activeP2POrder = activeP2POrder,
-                onActiveP2POrderChange = { activeP2POrder = it },
+                onActiveP2POrderChange = {
+                    activeP2POrder = it
+                },
                 showNotifications = showNotifications,
-                onShowNotificationsChange = { showNotifications = it },
-                showDepositDialog = { showDepositDialog = true },
-                showWithdrawDialog = { showWithdrawDialog = true },
+                onShowNotificationsChange = {
+                    showNotifications = it
+                },
+                showDepositDialog = {
+                    showDepositDialog = true
+                },
+                showWithdrawDialog = {
+                    showWithdrawDialog = true
+                },
                 context = context
             )
         }
@@ -521,7 +577,8 @@ private fun MainAppContent(
     showWithdrawDialog: () -> Unit,
     context: android.content.Context
 ) {
-    val canEnterMainApp = currentUserRole == "ADMIN" || currentKycStatus == "VERIFIED"
+    val canEnterMainApp =
+        currentUserRole == "ADMIN" || currentKycStatus == "VERIFIED"
 
     if (!canEnterMainApp) return
 
@@ -540,10 +597,18 @@ private fun MainAppContent(
                     activeP2POrder.id,
                     proofUri,
                     onSuccess = {
-                        Toast.makeText(context, "Payment marked as paid", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            "Payment marked as paid",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     },
                     onError = {
-                        Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            context,
+                            it,
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 )
             },
@@ -552,10 +617,18 @@ private fun MainAppContent(
                     activeP2POrder.id,
                     onSuccess = {
                         onActiveP2POrderChange(null)
-                        Toast.makeText(context, "Escrow released", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            "Escrow released",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     },
                     onError = {
-                        Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            context,
+                            it,
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 )
             },
@@ -564,27 +637,43 @@ private fun MainAppContent(
                     activeP2POrder.id,
                     reason,
                     onSuccess = {
-                        Toast.makeText(context, "Dispute submitted for admin review", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            "Dispute submitted for admin review",
+                            Toast.LENGTH_SHORT
+                        ).show()
                     },
                     onError = {
-                        Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            context,
+                            it,
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 )
             },
-            onClose = { onActiveP2POrderChange(null) }
+            onClose = {
+                onActiveP2POrderChange(null)
+            }
         )
         return
     }
 
     if (showNotifications) {
         AlertDialog(
-            onDismissRequest = { onShowNotificationsChange(false) },
-            title = { Text("Notifications") },
+            onDismissRequest = {
+                onShowNotificationsChange(false)
+            },
+            title = {
+                Text("Notifications")
+            },
             text = {
                 if (transactions.isEmpty()) {
                     Text("No notifications yet.")
                 } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         transactions.take(12).forEach { tx ->
                             val message = when (tx.type) {
                                 TransactionType.SPIN_REWARD ->
@@ -593,24 +682,34 @@ private fun MainAppContent(
                                     } else {
                                         "Spin Wheel result recorded."
                                     }
+
                                 TransactionType.DAILY_REWARD ->
                                     "Daily reward credited: +${"%,.2f".format(tx.amountRealCoin)} RC."
+
                                 TransactionType.DEPOSIT ->
                                     "You successfully deposited ${"%,.2f".format(tx.amountRealCoin)} RC."
+
                                 TransactionType.WITHDRAWAL ->
                                     "Withdrawal request: ${"%,.2f".format(tx.amountRealCoin)} RC."
+
                                 TransactionType.P2P_BUY ->
                                     "P2P buy completed: ${"%,.2f".format(tx.amountRealCoin)} RC."
+
                                 TransactionType.P2P_SELL ->
                                     "P2P sell completed: ${"%,.2f".format(tx.amountRealCoin)} RC."
                             }
+
                             Text(message)
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { onShowNotificationsChange(false) }) {
+                TextButton(
+                    onClick = {
+                        onShowNotificationsChange(false)
+                    }
+                ) {
                     Text("Close")
                 }
             }
@@ -626,14 +725,18 @@ private fun MainAppContent(
                     actionIconContentColor = Color(0xFFFFC107)
                 ),
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             Icons.Default.MonetizationOn,
                             contentDescription = "RealCoin",
                             tint = Color(0xFFFFC107),
                             modifier = Modifier.size(28.dp)
                         )
+
                         Spacer(Modifier.width(8.dp))
+
                         Text(
                             "Real-Coins",
                             color = Color.White,
@@ -642,14 +745,23 @@ private fun MainAppContent(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { onShowNotificationsChange(true) }) {
+                    IconButton(
+                        onClick = {
+                            onShowNotificationsChange(true)
+                        }
+                    ) {
                         Icon(
                             Icons.Default.Notifications,
                             contentDescription = "Notifications",
                             tint = Color(0xFFFFC107)
                         )
                     }
-                    IconButton(onClick = { onDestinationChange(AppDestination.PROFILE) }) {
+
+                    IconButton(
+                        onClick = {
+                            onDestinationChange(AppDestination.PROFILE)
+                        }
+                    ) {
                         Icon(
                             Icons.Default.Person,
                             contentDescription = "Profile",
@@ -663,35 +775,75 @@ private fun MainAppContent(
             NavigationBar {
                 NavigationBarItem(
                     selected = currentDestination == AppDestination.HOME,
-                    onClick = { onDestinationChange(AppDestination.HOME) },
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Dashboard") },
-                    label = { Text("Dashboard") },
+                    onClick = {
+                        onDestinationChange(AppDestination.HOME)
+                    },
+                    icon = {
+                        Icon(
+                            Icons.Default.Home,
+                            contentDescription = "Dashboard"
+                        )
+                    },
+                    label = {
+                        Text("Dashboard")
+                    },
                     modifier = Modifier.testTag("nav_home")
                 )
+
                 NavigationBarItem(
                     selected = currentDestination == AppDestination.P2P,
-                    onClick = { onDestinationChange(AppDestination.P2P) },
-                    icon = { Icon(Icons.Default.SwapHoriz, contentDescription = "P2P") },
-                    label = { Text("P2P") },
+                    onClick = {
+                        onDestinationChange(AppDestination.P2P)
+                    },
+                    icon = {
+                        Icon(
+                            Icons.Default.SwapHoriz,
+                            contentDescription = "P2P"
+                        )
+                    },
+                    label = {
+                        Text("P2P")
+                    },
                     modifier = Modifier.testTag("nav_p2p")
                 )
+
                 NavigationBarItem(
                     selected = currentDestination == AppDestination.SPIN,
-                    onClick = { onDestinationChange(AppDestination.SPIN) },
-                    icon = { Icon(Icons.Default.Casino, contentDescription = "Spin Wheel") },
-                    label = { Text("Spin Wheel") },
+                    onClick = {
+                        onDestinationChange(AppDestination.SPIN)
+                    },
+                    icon = {
+                        Icon(
+                            Icons.Default.Casino,
+                            contentDescription = "Spin Wheel"
+                        )
+                    },
+                    label = {
+                        Text("Spin Wheel")
+                    },
                     modifier = Modifier.testTag("nav_spin")
                 )
+
                 NavigationBarItem(
                     selected = currentDestination == AppDestination.PROFILE,
-                    onClick = { onDestinationChange(AppDestination.PROFILE) },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
-                    label = { Text("Settings") },
+                    onClick = {
+                        onDestinationChange(AppDestination.PROFILE)
+                    },
+                    icon = {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = "Settings"
+                        )
+                    },
+                    label = {
+                        Text("Settings")
+                    },
                     modifier = Modifier.testTag("nav_settings")
                 )
             }
         }
     ) { innerPadding ->
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -706,17 +858,29 @@ private fun MainAppContent(
                         realCoinUsdPrice = realCoinUsdPrice,
                         onOpenDeposit = showDepositDialog,
                         onOpenWithdraw = showWithdrawDialog,
-                        onOpenReferral = { onDestinationChange(AppDestination.REFERRAL) },
-                        onOpenP2P = { onDestinationChange(AppDestination.P2P) },
-                        onOpenSpin = { onDestinationChange(AppDestination.SPIN) },
-                        onOpenHelp = { onDestinationChange(AppDestination.HELP_CENTER) },
-                        onOpenLevels = { onDestinationChange(AppDestination.LEVELS) }
+                        onOpenReferral = {
+                            onDestinationChange(AppDestination.REFERRAL)
+                        },
+                        onOpenP2P = {
+                            onDestinationChange(AppDestination.P2P)
+                        },
+                        onOpenSpin = {
+                            onDestinationChange(AppDestination.SPIN)
+                        },
+                        onOpenHelp = {
+                            onDestinationChange(AppDestination.HELP_CENTER)
+                        },
+                        onOpenLevels = {
+                            onDestinationChange(AppDestination.LEVELS)
+                        }
                     )
                 }
 
                 AppDestination.LEVELS -> {
                     LevelsScreen(
-                        onBack = { onDestinationChange(AppDestination.HOME) }
+                        onBack = {
+                            onDestinationChange(AppDestination.HOME)
+                        }
                     )
                 }
 
@@ -730,10 +894,18 @@ private fun MainAppContent(
                             viewModel.deleteOwnP2PAd(
                                 adId = adId,
                                 onSuccess = {
-                                    Toast.makeText(context, "Advertisement deleted.", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        "Advertisement deleted.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 },
                                 onError = {
-                                    Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        it,
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                             )
                         },
@@ -745,7 +917,11 @@ private fun MainAppContent(
                                     onActiveP2POrderChange(createdOrder)
                                 },
                                 onError = {
-                                    Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                                    Toast.makeText(
+                                        context,
+                                        it,
+                                        Toast.LENGTH_LONG
+                                    ).show()
                                 }
                             )
                         }
@@ -761,17 +937,26 @@ private fun MainAppContent(
                 }
 
                 AppDestination.REFERRAL -> {
-                    val referralSummary by viewModel.referralSummary.collectAsState()
+                    val referralSummary by
+                        viewModel.referralSummary.collectAsState()
+
                     ReferralScreen(
-                        referralCode = referralSummary?.referralCode ?: currentUserReferralCode,
-                        referredCount = referralSummary?.referredCount ?: 0,
-                        onBack = { onDestinationChange(AppDestination.PROFILE) }
+                        referralCode =
+                            referralSummary?.referralCode
+                                ?: currentUserReferralCode,
+                        referredCount =
+                            referralSummary?.referredCount ?: 0,
+                        onBack = {
+                            onDestinationChange(AppDestination.PROFILE)
+                        }
                     )
                 }
 
                 AppDestination.HELP_CENTER -> {
                     HelpCenterScreen(
-                        onBack = { onDestinationChange(AppDestination.PROFILE) },
+                        onBack = {
+                            onDestinationChange(AppDestination.PROFILE)
+                        },
                         userId = userProfile.id,
                         repository = viewModel.repository
                     )
@@ -779,7 +964,9 @@ private fun MainAppContent(
 
                 AppDestination.ADMIN -> {
                     AdminControlScreen(
-                        onBack = { onDestinationChange(AppDestination.PROFILE) },
+                        onBack = {
+                            onDestinationChange(AppDestination.PROFILE)
+                        },
                         adminUserId = userProfile.id,
                         repository = viewModel.repository
                     )
@@ -792,12 +979,22 @@ private fun MainAppContent(
                         onDestinationChange = onDestinationChange,
                         onLogout = {
                             viewModel.logout()
-                            context.getSharedPreferences(APP_STATE_PREFS, android.content.Context.MODE_PRIVATE)
+
+                            context.getSharedPreferences(
+                                APP_STATE_PREFS,
+                                android.content.Context.MODE_PRIVATE
+                            )
                                 .edit()
                                 .remove(KYC_PENDING)
                                 .apply()
+
                             onDestinationChange(AppDestination.LANDING)
-                            Toast.makeText(context, "Logged out successfully", Toast.LENGTH_SHORT).show()
+
+                            Toast.makeText(
+                                context,
+                                "Logged out successfully",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         },
                         viewModel = viewModel
                     )
@@ -817,10 +1014,16 @@ private fun ProfileSettingsContent(
     onLogout: () -> Unit,
     viewModel: RealCoinViewModel
 ) {
-    var currentLevel by remember(userProfile.id) { mutableStateOf<String?>(null) }
+    var currentLevel by remember(userProfile.id) {
+        mutableStateOf<String?>(null)
+    }
 
     LaunchedEffect(userProfile.id) {
-        currentLevel = viewModel.repository.getRewardStatus(userProfile.id)?.level?.name
+        currentLevel =
+            viewModel.repository
+                .getRewardStatus(userProfile.id)
+                ?.level
+                ?.name
     }
 
     Column(
@@ -829,44 +1032,73 @@ private fun ProfileSettingsContent(
             .verticalScroll(rememberScrollState())
             .padding(20.dp)
     ) {
-        Text("Settings", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            "Settings",
+            style = MaterialTheme.typography.headlineMedium
+        )
+
         Spacer(Modifier.height(16.dp))
 
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                Modifier.padding(16.dp)
+            ) {
                 Text(
                     "Username: ${userProfile.username.ifBlank { "Guest" }}",
                     style = MaterialTheme.typography.titleMedium
                 )
+
                 Text(
                     "Email: ${userProfile.email.ifBlank { "Not registered" }}",
                     color = Color.Gray
                 )
+
                 Text(
                     "Current Level: ${currentLevel ?: "Loading..."}",
                     color = Color(0xFFD89E00),
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(Modifier.height(8.dp))
-                val displayedKycStatus =
-                    if (currentUserRole == "ADMIN") "ADMIN — KYC not required"
-                    else userProfile.kycStatus
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.height(8.dp))
+
+                val displayedKycStatus =
+                    if (currentUserRole == "ADMIN") {
+                        "ADMIN — KYC not required"
+                    } else {
+                        userProfile.kycStatus
+                    }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text("KYC Status: ")
+
                     Text(
                         displayedKycStatus,
                         color = when {
-                            currentUserRole == "ADMIN" -> Color(0xFF2E7D32)
-                            userProfile.kycStatus == "VERIFIED" -> Color(0xFF2E7D32)
-                            userProfile.kycStatus == "PENDING" -> Color(0xFFF57F17)
-                            userProfile.kycStatus == "REJECTED" -> Color(0xFFC62828)
-                            else -> Color.Gray
+                            currentUserRole == "ADMIN" ->
+                                Color(0xFF2E7D32)
+
+                            userProfile.kycStatus == "VERIFIED" ->
+                                Color(0xFF2E7D32)
+
+                            userProfile.kycStatus == "PENDING" ->
+                                Color(0xFFF57F17)
+
+                            userProfile.kycStatus == "REJECTED" ->
+                                Color(0xFFC62828)
+
+                            else ->
+                                Color.Gray
                         }
                     )
                 }
+
                 if (userProfile.realLockedBalance > 0) {
                     Spacer(Modifier.height(4.dp))
+
                     Text(
                         "Locked in Escrow/Withdrawal: ${"%,.2f".format(userProfile.realLockedBalance)} RC",
                         color = Color(0xFFC62828)
@@ -882,11 +1114,19 @@ private fun ProfileSettingsContent(
             repository = viewModel.repository
         )
 
-        if (currentUserRole != "ADMIN" &&
-            (userProfile.kycStatus == "NOT_SUBMITTED" || userProfile.kycStatus == "REJECTED")) {
+        if (
+            currentUserRole != "ADMIN" &&
+            (
+                userProfile.kycStatus == "NOT_SUBMITTED" ||
+                userProfile.kycStatus == "REJECTED"
+            )
+        ) {
             Spacer(Modifier.height(12.dp))
+
             Button(
-                onClick = { onDestinationChange(AppDestination.KYC) },
+                onClick = {
+                    onDestinationChange(AppDestination.KYC)
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Submit KYC Verification")
@@ -901,43 +1141,70 @@ private fun ProfileSettingsContent(
                 .fillMaxWidth()
                 .testTag("logout_button")
         ) {
-            Icon(Icons.Default.ExitToApp, contentDescription = "Log Out")
+            Icon(
+                Icons.Default.ExitToApp,
+                contentDescription = "Log Out"
+            )
+
             Spacer(Modifier.width(8.dp))
+
             Text("Log Out")
         }
 
         Spacer(Modifier.height(12.dp))
 
         OutlinedButton(
-            onClick = { onDestinationChange(AppDestination.REFERRAL) },
+            onClick = {
+                onDestinationChange(AppDestination.REFERRAL)
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("settings_referral_button")
         ) {
-            Icon(Icons.Default.People, contentDescription = "Referral")
+            Icon(
+                Icons.Default.People,
+                contentDescription = "Referral"
+            )
+
             Spacer(Modifier.width(8.dp))
+
             Text("Referral")
         }
 
         Spacer(Modifier.height(12.dp))
 
         OutlinedButton(
-            onClick = { onDestinationChange(AppDestination.HELP_CENTER) },
+            onClick = {
+                onDestinationChange(AppDestination.HELP_CENTER)
+            },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(Icons.Default.HelpOutline, contentDescription = "Help Center")
+            Icon(
+                Icons.Default.HelpOutline,
+                contentDescription = "Help Center"
+            )
+
             Spacer(Modifier.width(8.dp))
+
             Text("Help Center")
         }
 
         if (currentUserRole == "ADMIN") {
             Spacer(Modifier.height(8.dp))
+
             OutlinedButton(
-                onClick = { onDestinationChange(AppDestination.ADMIN) },
+                onClick = {
+                    onDestinationChange(AppDestination.ADMIN)
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.AdminPanelSettings, contentDescription = "Admin")
+                Icon(
+                    Icons.Default.AdminPanelSettings,
+                    contentDescription = "Admin"
+                )
+
                 Spacer(Modifier.width(8.dp))
+
                 Text("Admin Control Panel")
             }
         }
