@@ -376,7 +376,7 @@ async function handle(request, env) {
 
   if (request.method === 'POST' && path === '/v1/auth/login') {
     const body = await readJson(request);
-    const login = text(body.login, 254).toLowerCase();
+    const login = text(body.login || body.email || body.username, 254).toLowerCase();
     const password = typeof body.password === 'string' ? body.password : '';
     if (!login || password.length < 8 || password.length > 256) return json({ error: 'invalid_credentials' }, 400);
     if (!await allowLoginAttempt(env.DB, login, request, Date.now(), env)) {
